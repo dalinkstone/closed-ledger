@@ -105,13 +105,19 @@ The transaction register (the core view) uses Qt's Model/View pattern:
 ### Color Palette
 
 ```
-Sidebar: #F5F5F5 | Header: #4A7AB5 (steel blue) | Negative: #CC0000 | Positive: #006600
-Row alt: #F0F5FA | Row hover: #E3EDF7 | Row selected: #D0E0F0 | Borders: #E0E0E0
+Sidebar bg: #F5F5F5 | Sidebar header/footer: #EBEBEB | Tab bar: #2B579A (navy)
+Tab selected: #1E4270 | Tab accent: #5BA3E6 | Link/action: #2B579A
+Negative: #CC0000 | Positive: #006600 | Text primary: #333 | Text secondary: #555
+Row alt: #F0F5FA | Row hover: #E3EDF7 | Row selected: #D0E0F0 | Borders: #D0D0D0/#E0E0E0
 ```
+
+### Tab Names
+
+ALL CAPS matching Quicken: HOME, SPENDING, BILLS & INCOME, PLANNING, INVESTING, PROPERTY & DEBT, REPORTS.
 
 ### UI Density
 
-Dense layout matching Quicken: 13-14px base font, 30-34px row heights, ~240px fixed sidebar. Negative balances in red.
+Dense layout matching Quicken: 11-13px base font, 30-34px row heights, 240px fixed sidebar. Negative balances in red. Sidebar accounts ~12px, group headers 13px bold.
 
 ### Startup Flow
 

@@ -219,12 +219,14 @@ closed_ledger/
 
 The UI closely follows Quicken's visual conventions:
 
-- **Color Palette**: Steel blue header bar (`#4A7AB5`), white content area, light gray sidebar (`#F5F5F5`), red for debts/negative values
-- **Typography**: System font, 13–14px base for dense data display
-- **Layout**: Fixed left sidebar (~240px), tab bar across top, scrollable content area
+- **Color Palette**: Dark navy tab bar (`#2B579A`), white content area, light gray sidebar (`#F5F5F5`) with `#EBEBEB` header/footer bands, red for debts/negative values (`#CC0000`)
+- **Typography**: System font, 11–13px base for dense data display, ALL CAPS tab labels
+- **Layout**: Fixed left sidebar (240px) with vertical separator, dark navy tab bar across top of content, scrollable content area
+- **Sidebar Structure**: `ACCOUNTS` header with toolbar icons (refresh/add/settings), "All Transactions" link, collapsible account groups with disclosure triangles (▾), Net Worth footer, "+ Add an Account" link
+- **Tab Navigation**: HOME, SPENDING, BILLS & INCOME, PLANNING, INVESTING, PROPERTY & DEBT, REPORTS
 - **Tables**: Dense row height (~30px), alternating row colors, right-aligned numbers
 - **Negative values**: Displayed in red (e.g., `-$283,043`), positive in black
-- **Account Groups**: Collapsible tree nodes with bold group headers and indented accounts
+- **Account Groups**: Collapsible nodes with bold group headers, right-aligned totals, indented accounts with hover highlight
 
 ## License
 

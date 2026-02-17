@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.db
+*.db.enc
+salt
+key_check
+*.egg-info/
+dist/
+build/
+.mypy_cache/

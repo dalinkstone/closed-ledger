@@ -234,22 +234,25 @@ Payees from screenshots: Car Payment ($300), ATM Withdrawal ($120), Bo-bo- Chili
 
 ```
 QMainWindow
-├── QSplitter (horizontal)
-│   ├── SidebarWidget (QWidget, fixed ~240px)
-│   │   ├── QLabel "ACCOUNTS" header + toolbar buttons
-│   │   ├── QTreeView (account tree model)
-│   │   ├── QLabel "Net Worth: $XXX,XXX"
-│   │   └── QPushButton "+ Add an Account"
-│   └── QWidget (right panel)
-│       ├── QTabBar (top navigation: Home, Spending, Bills, etc.)
+├── QHBoxLayout (central widget)
+│   ├── SidebarWidget (QWidget, fixed 240px, bg #F5F5F5)
+│   │   ├── Header bar (bg #EBEBEB): "▾ ACCOUNTS" + [↻] [+] [⚙] toolbar buttons
+│   │   ├── QScrollArea
+│   │   │   ├── QPushButton "All Transactions" (blue link)
+│   │   │   └── Account groups (▾ disclosure + group name + total, indented accounts)
+│   │   ├── Net Worth footer (bg #EBEBEB): "Net Worth" + formatted amount
+│   │   └── QPushButton "+ Add an Account" (blue link)
+│   ├── QFrame (VLine separator, #D0D0D0)
+│   └── QWidget (right panel, bg white)
+│       ├── QTabBar (bg #2B579A navy, ALL CAPS white text, 36px height)
+│       │   Tabs: HOME | SPENDING | BILLS & INCOME | PLANNING | INVESTING | PROPERTY & DEBT | REPORTS
 │       └── QStackedWidget (content pages, switched by tab)
 │           ├── HomeView (dashboard)
 │           ├── RegisterView (transaction table)
 │           ├── SpendingView
-│           ├── BillsView
-│           ├── BudgetsView
+│           ├── BillsView / BudgetsView
 │           └── ReportsView
-└── QStatusBar (transaction count, balances)
+└── QStatusBar (bg #F0F0F0): "N Transactions" | "Current Balance: X" | "Ending Balance: X"
 ```
 
 ### Transaction Register (QTableView + QAbstractTableModel)
@@ -269,18 +272,28 @@ Column layout (matching Screenshot 1):
 
 ```python
 COLORS = {
+    # Sidebar
     'sidebar_bg': '#F5F5F5',
-    'header_bg': '#4A7AB5',
-    'header_text': '#FFFFFF',
+    'sidebar_header_bg': '#EBEBEB',
+    # Tab bar (dark navy, matching Quicken reference images)
+    'tab_bar_bg': '#2B579A',
+    'tab_selected_bg': '#1E4270',
+    'tab_accent': '#5BA3E6',
+    'tab_hover_bg': '#34629F',
+    'tab_text': '#FFFFFF',
+    # Content
     'content_bg': '#FFFFFF',
     'text_primary': '#333333',
-    'text_secondary': '#666666',
+    'text_secondary': '#555555',
     'text_negative': '#CC0000',
     'text_positive': '#006600',
+    'link_color': '#2B579A',
+    # Table rows
     'row_alt': '#F0F5FA',
     'row_hover': '#E3EDF7',
     'row_selected': '#D0E0F0',
     'border_light': '#E0E0E0',
+    'border_medium': '#D0D0D0',
     # Chart colors (per category)
     'chart_home': '#2E8B57',
     'chart_auto': '#6A5ACD',
