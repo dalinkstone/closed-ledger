@@ -4,73 +4,122 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Closed Ledger is a local-first, single-user personal finance desktop app modeled after Quicken Classic (2013-2017). No cloud, no auth, no external APIs — everything runs on localhost:3000 with a single SQLite file.
+Closed Ledger is a local-first, single-user personal finance desktop app modeled after Quicken Classic (2013-2017). It is a **native desktop application** — no web server, no HTTP, no localhost, no browser. Python + PySide6 (Qt 6) + SQLite, encrypted at rest. Your financial data never leaves your filesystem.
+
+## Key Reference Files
+
+- **IMPLEMENTATION.md** — Source of truth for schema, security requirements, UI specs, color palette, and phase details. **Read before starting any phase.**
+- **INSTRUCTIONS.md** — Phased build workflow with copy-paste prompts and testing checklists
+- **README.md** — Project overview, architecture rationale, data model diagram, project structure
 
 ## Build & Dev Commands
 
 ```bash
-npm install              # Install dependencies
-npm run dev              # Start dev server (localhost:3000)
-npm run build            # Production build
-npm start                # Start production server
-npm run db:generate      # Generate Drizzle migrations from schema
-npm run db:migrate       # Run pending migrations (tsx src/lib/db/migrate.ts)
-npm run db:seed          # Seed database with demo data (tsx src/lib/db/seed.ts)
-npx tsc --noEmit         # TypeScript check (no test framework configured)
+python3 -m venv venv && source venv/bin/activate   # Create/activate virtualenv
+pip install -r requirements.txt                      # Install deps (PySide6, cryptography)
+python -m closed_ledger                              # Run the application
+python -m closed_ledger --seed                       # Run with demo data seeding
 ```
+
+No test framework is configured. Verify correctness with the testing checklists in INSTRUCTIONS.md. Type checking can be done with `mypy` if added.
 
 ## Tech Stack
 
-Next.js 14 (App Router), TypeScript (strict), SQLite via better-sqlite3, Drizzle ORM, Tailwind CSS 3, Recharts, date-fns, Lucide React. Scripts run via `tsx`.
+Python 3.11+, PySide6 (Qt 6) for GUI, SQLite via Python's built-in `sqlite3`, `cryptography` (Fernet/AES-256) for database encryption. **Only two external dependencies**: `PySide6>=6.6` and `cryptography>=42.0`.
 
 ## Architecture
-
-### Key Reference Files
-
-- **README.md** — Project overview, tech stack rationale, data model diagram
-- **IMPLEMENTATION.md** — Full technical spec: schema definitions, UI column specs, color palette, category seed list, phase-by-phase details
-- **INSTRUCTIONS.md** — Phased Claude Code workflow with copy-paste prompts and testing checklists
-
-**Read IMPLEMENTATION.md before starting any phase.** It is the source of truth for schema, UI specs, and conventions.
 
 ### Development Phases
 
 The project is built in 8 sequential phases, each designed for a fresh Claude Code session:
 
-1. Foundation (Next.js setup, schema, migrations, seed data, layout shell)
-2. Account Sidebar (live balances, groups, CRUD, net worth)
-3. Transaction Register (table, CRUD, inline editing, filters, running balance)
-4. Home Dashboard (spending donut chart, bill reminders, budget summary)
-5. Categories & Budgets (category CRUD, budget tracking, progress bars)
+1. Foundation (project structure, security/encryption layer, passphrase gate, schema, seed data, main window shell)
+2. Account Sidebar (QTreeView, live balances, groups, net worth, account CRUD)
+3. Transaction Register (QTableView + model/view/delegate, inline editing, filters, running balance)
+4. Home Dashboard (QtCharts donut chart, bill reminders, budget summary)
+5. Categories & Budgets (category tree CRUD, budget tracking, progress bars)
 6. Bills & Scheduling (bill CRUD, mark-as-paid, recurring date advancement)
-7. Reports & Analytics (spending over time, net worth, income vs expenses, category breakdown)
-8. Polish (CSV import/export, Cmd+K search, keyboard shortcuts, backup/restore)
+7. Reports (spending over time, net worth, income vs expenses, category breakdown — all QtCharts)
+8. Polish (CSV import/export, Ctrl+K search, auto-lock, keyboard shortcuts, encrypted backup/restore)
 
-### Server vs Client Components
+### Project Structure
 
-Server components by default for all data reads. Client components (`"use client"`) only for: forms, dropdowns, charts (Recharts requires it), click handlers, `usePathname`. Data mutations go through API routes (`src/app/api/`).
+```
+closed_ledger/
+├── __main__.py              # Entry point: python -m closed_ledger
+├── app.py                   # QApplication setup, passphrase gate, main window launch
+├── security/                # Encryption, passphrase dialogs, auto-lock
+│   ├── crypto.py            # Fernet encrypt/decrypt, PBKDF2 key derivation, secure delete
+│   ├── passphrase.py        # FirstRunDialog, UnlockDialog (Qt dialogs)
+│   └── session.py           # Auto-lock timer, session state
+├── db/
+│   ├── connection.py        # DatabaseManager: decrypt→open→use→close→encrypt cycle
+│   ├── schema.py            # CREATE TABLE/INDEX statements (additive, IF NOT EXISTS)
+│   ├── seed.py              # Demo data (13 accounts, 250+ transactions, 40+ categories)
+│   └── queries/             # All SQL query functions (accounts, transactions, categories, bills, budgets, dashboard, reports)
+├── ui/
+│   ├── main_window.py       # QMainWindow: sidebar + QTabBar + QStackedWidget
+│   ├── sidebar.py           # QTreeView account sidebar
+│   ├── views/               # Home, Register, Spending, Bills, Budgets, Reports
+│   ├── models/              # QAbstractTableModel subclasses for Qt model/view
+│   ├── delegates/           # CurrencyDelegate, DateDelegate, CategoryDelegate for QTableView
+│   ├── dialogs/             # Account, bill, import, backup dialogs
+│   └── widgets/             # DonutChart, BarChart, LineChart (QtCharts), CurrencyLabel
+└── utils/
+    ├── currency.py          # cents ↔ display formatting (all money is stored as integer cents)
+    ├── dates.py             # Date helpers
+    └── platform.py          # Platform-specific app data paths, file permissions
+```
+
+### Security Model (Non-Negotiable)
+
+These are hard requirements — every phase must comply:
+
+- **No network access.** No imports of `requests`, `urllib`, `http`, `socket`. No `QNetworkAccessManager`. The app never opens a socket or binds a port.
+- **Encrypted at rest.** SQLite database stored as `.db.enc` (Fernet/AES-256). Decrypted to temp file only while running. Temp file is overwritten with `os.urandom` bytes and deleted on close.
+- **Passphrase-gated.** PBKDF2-HMAC-SHA256 with 600,000 iterations. Passphrase never stored to disk, overwritten in memory after key derivation.
+- **File permissions.** App data directory: `0o700`. All files: `0o600`.
+- **Parameterized SQL only.** ALL queries use `?` placeholders. Never use f-strings, `.format()`, or `%` in SQL. Verify with: `grep -rn "f'" closed_ledger/db/` (should find nothing).
 
 ### Data Conventions
 
-- **All monetary values stored as integers in cents** (e.g., `$1,234.56` → `123456`). Conversion to dollars only in the UI layer.
+- **All monetary values stored as integers in cents** (e.g., `$1,234.56` → `123456`). Conversion to dollars only in the UI layer via `cents_to_display()`.
 - **Negative amounts** = money leaving account (payments, expenses). **Positive** = money entering (deposits, income).
-- **Account balances are never stored** — always computed: `initialBalance + SUM(transactions.amount)`.
-- **Transfers** create two linked transactions referencing each other via `transferTransactionId`.
-- **Running balance** in register: sort by `date ASC, id ASC`, accumulate from `initialBalance`.
-- **Dates** stored as TEXT in ISO format. Display format in register: `M/D/YYYY` (no zero-padding).
-- **Currency in transaction table**: no `$` sign, just `"300.00"` (tabular-nums). In sidebar/dashboard: `$1,234` format with `$` sign.
+- **Account balances are never stored** — always computed: `initial_balance + COALESCE(SUM(transactions.amount), 0)`.
+- **Transfers** create two linked transactions referencing each other via `transfer_transaction_id`.
+- **Running balance** in register: sort by `date ASC, id ASC`, accumulate from `initial_balance`.
+- **Dates** stored as TEXT in ISO format. Display format: `M/D/YYYY` (no zero-padding).
+- **Currency in register table**: no `$` sign, just `"300.00"` (tabular-nums). In sidebar/dashboard: `$1,234` format with `$` sign.
 
 ### Database
 
-SQLite file at `data/closed-ledger.db`. The `data/` directory is gitignored but must never be deleted by any build step. Drizzle migrations in `drizzle/` are committed. Schema source of truth: `src/lib/db/schema.ts`. Five tables: accounts, transactions, categories, bill_reminders, budgets.
+Encrypted file at `~/.local/share/closed-ledger/closed-ledger.db.enc` (Linux), `~/Library/Application Support/closed-ledger/` (macOS), or `%APPDATA%/closed-ledger/` (Windows). Schema managed via additive `CREATE TABLE IF NOT EXISTS` statements in `schema.py`. Five tables: `accounts`, `transactions`, `categories`, `bill_reminders`, `budgets`.
+
+### Qt Model/View Architecture
+
+The transaction register (the core view) uses Qt's Model/View pattern:
+- **TransactionTableModel** (QAbstractTableModel): holds data, implements `data()`, `setData()`, `flags()`
+- **QTableView**: displays the model with explicit column widths matching Quicken layout
+- **Custom Delegates**: CurrencyDelegate (right-aligned currency), DateDelegate (M/D/YYYY), CategoryDelegate (combobox with QCompleter)
 
 ### Color Palette
 
 ```
-Sidebar: #F5F5F5 | Header: #4A7AB5 (steel blue) | Negative: #CC0000 (red) | Positive: #006600
+Sidebar: #F5F5F5 | Header: #4A7AB5 (steel blue) | Negative: #CC0000 | Positive: #006600
 Row alt: #F0F5FA | Row hover: #E3EDF7 | Row selected: #D0E0F0 | Borders: #E0E0E0
 ```
 
 ### UI Density
 
-Dense layout matching Quicken: 13-14px base font, 30-34px row heights, 240px fixed sidebar. Negative balances in red.
+Dense layout matching Quicken: 13-14px base font, 30-34px row heights, ~240px fixed sidebar. Negative balances in red.
+
+### Startup Flow
+
+1. `QApplication` created
+2. Ensure app data directory exists with `0o700` permissions
+3. If first run (no `salt`/`key_check` files): show `FirstRunDialog` → create passphrase → derive key → create encrypted DB
+4. If returning: show `UnlockDialog` → verify passphrase against canary → decrypt DB to temp file
+5. Open `DatabaseManager` with derived key
+6. If `--seed` flag: populate demo data
+7. Show `MainWindow`
+8. On close: encrypt DB back to disk, secure-delete temp file
