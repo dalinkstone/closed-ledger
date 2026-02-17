@@ -1,4 +1,4 @@
-# OpenLedger — A Quicken-Inspired Personal Finance Manager
+# Closed Ledger — A Quicken-Inspired Personal Finance Manager
 
 > A full-featured, single-user personal finance desktop application modeled after Quicken Classic (circa 2013–2017). Built as a local-first web application with persistent SQLite storage.
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-OpenLedger is a faithful recreation of Intuit's Quicken personal finance software — specifically the Quicken Premier 2013–2017 era desktop experience. It provides comprehensive personal finance management including account tracking, transaction registers, budgeting, bill reminders, spending analysis, and net worth calculation — all running locally on your machine with zero cloud dependency.
+Closed Ledger is a faithful recreation of Intuit's Quicken personal finance software — specifically the Quicken Premier 2013–2017 era desktop experience. It provides comprehensive personal finance management including account tracking, transaction registers, budgeting, bill reminders, spending analysis, and net worth calculation — all running locally on your machine with zero cloud dependency.
 
 This project exists as a learning exercise and personal tool. It is not affiliated with Quicken Inc. or Intuit.
 
@@ -39,7 +39,7 @@ The UI is modeled after three core views captured from Quicken:
 
 ### Why This Stack?
 
-- **SQLite** is the cornerstone choice. The database file (`openledger.db`) lives in a `data/` directory at the project root. It persists across `npm run dev` restarts, rebuilds, and even full `node_modules` wipes. This mirrors how Quicken stored everything in a single `.qdf` file.
+- **SQLite** is the cornerstone choice. The database file (`closed-ledger.db`) lives in a `data/` directory at the project root. It persists across `npm run dev` restarts, rebuilds, and even full `node_modules` wipes. This mirrors how Quicken stored everything in a single `.qdf` file.
 - **Next.js App Router** gives us server components for heavy data queries (transaction lists, reports) and API routes for mutations — all in one process.
 - **Drizzle ORM** provides type-safe schema definitions that double as documentation and enable auto-migrations.
 - **No external services** — everything runs on `localhost:3000`. No accounts, no API keys, no cloud.
@@ -49,7 +49,7 @@ The UI is modeled after three core views captured from Quicken:
 ```
 project-root/
 ├── data/
-│   └── openledger.db      ← SQLite database (GITIGNORED but never deleted)
+│   └── closed-ledger.db   ← SQLite database (GITIGNORED but never deleted)
 ├── drizzle/
 │   └── migrations/         ← Schema migration files (COMMITTED)
 └── src/

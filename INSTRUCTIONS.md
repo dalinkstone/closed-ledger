@@ -1,945 +1,918 @@
-# INSTRUCTIONS.md — Claude Code Prompts by Phase
+# INSTRUCTIONS.md — Claude Code Workflow
 
-> This file contains the exact prompts to feed to Claude Code for each development phase. Run them in order. Each prompt assumes the previous phase is complete and working. Before starting, ensure Claude Code has access to README.md and IMPLEMENTATION.md in the project root.
+> **How to use this file**: Each phase below is designed to be run in its own Claude Code session. For each phase, you will copy-paste one or two prompts into Claude Code, let it work, then manually test the results using the provided checklist before moving to the next phase.
 
 ---
 
-## Pre-Flight
+## How This Works
 
-Before beginning Phase 1, give Claude Code this context-setting prompt:
-
-### Prompt 0: Project Context
+### Your Workflow for Each Phase
 
 ```
-Read the README.md and IMPLEMENTATION.md files in this project root. These are the guiding
-documents for the entire project. Familiarize yourself with the tech stack, data model,
-design specifications, and phased development plan before proceeding.
-
-This project is called OpenLedger — a Quicken-inspired personal finance manager. It is a
-local-first, single-user Next.js application backed by SQLite. All monetary values are
-stored as integers in cents. The UI is modeled after Quicken Classic 2013–2017.
-
-Acknowledge that you've read both documents and summarize the key architectural decisions.
+1. Open a NEW Claude Code session (fresh context)
+2. Paste the CONTEXT PROMPT for that phase (it tells Claude Code what the project is and what's already done)
+3. Paste the BUILD PROMPT for that phase (the actual work instructions)
+4. Let Claude Code work. Answer any questions it asks.
+5. When it's done, run the TESTING CHECKLIST yourself.
+6. If something fails, paste the FIX PROMPT template with what's wrong.
+7. Once all tests pass, commit your code and move to the next phase.
 ```
+
+### Why New Sessions?
+
+Claude Code has a context window limit. A fresh session for each phase means Claude Code starts clean, reads the project files on disk, and doesn't get confused by stale context from previous work. The CONTEXT PROMPT at the start of each phase catches it up instantly.
+
+### Fix Prompt Template
+
+Whenever something doesn't work after a phase, use this template:
+
+```
+I just completed Phase [N] of the Closed Ledger project. Read IMPLEMENTATION.md for full context.
+
+The following test is failing:
+[describe what's wrong — e.g., "The sidebar shows $0 for all account balances" or "npm run dev crashes with error: Cannot find module 'better-sqlite3'"]
+
+The expected behavior is:
+[describe what should happen]
+
+Please investigate and fix this issue. Do not change anything unrelated to this fix.
+```
+
+### Important Files Claude Code Should Always Read
+
+At the start of each session, Claude Code should be aware of these files in the project root:
+- `README.md` — Project overview and structure
+- `IMPLEMENTATION.md` — Full architecture spec, data model, UI specs, color palette
+
+You don't need to tell Claude Code to read them explicitly — the context prompts below reference them. But if Claude Code seems confused, tell it: `Read IMPLEMENTATION.md before proceeding.`
 
 ---
 
 ## Phase 1: Foundation
 
-### Prompt 1.1: Project Scaffolding
+> **Goal**: A running Next.js app with SQLite database, complete schema, seed data, and the basic three-panel layout shell.
+
+### Step 1: Paste this CONTEXT + BUILD prompt into a new Claude Code session
 
 ```
-Initialize the OpenLedger project. Follow the architecture defined in IMPLEMENTATION.md.
+I'm starting a new project called "Closed Ledger" — a personal finance manager inspired by
+Quicken Classic (2013–2017 era). The project has planning docs already written.
 
-1. Create a Next.js 14 project with App Router, TypeScript (strict mode), and Tailwind CSS.
-2. Install these exact dependencies:
-   - better-sqlite3 and @types/better-sqlite3 (SQLite driver)
-   - drizzle-orm and drizzle-kit (ORM and migration tooling)
-   - recharts (charting)
-   - date-fns (date utilities)
-   - lucide-react (icons)
-3. Configure drizzle.config.ts pointing to src/lib/db/schema.ts and ./drizzle/migrations output.
-4. Add these npm scripts to package.json:
-   - "db:generate": "drizzle-kit generate"
-   - "db:migrate": "tsx src/lib/db/migrate.ts"
-   - "db:seed": "tsx src/lib/db/seed.ts"
-5. Create a .gitignore that includes data/ (the SQLite database directory) but NOT the drizzle migrations folder.
-6. Create the directory structure outlined in README.md under "Project Structure".
+Read README.md and IMPLEMENTATION.md in this directory. These define the full architecture,
+data model, UI specs, and phased build plan. Familiarize yourself with them before writing
+any code.
 
-Do not create any components or pages yet — just the project scaffold, configuration, and empty directories.
+Then execute Phase 1 — Foundation. Here's everything you need to build:
+
+1. PROJECT SETUP
+   - Initialize a Next.js 14 project with App Router, TypeScript (strict), Tailwind CSS 3
+   - The project name is "closed-ledger"
+   - Install dependencies: better-sqlite3, @types/better-sqlite3, drizzle-orm, drizzle-kit,
+     recharts, date-fns, lucide-react
+   - Install tsx as a dev dependency (for running seed/migrate scripts)
+   - Configure drizzle.config.ts for SQLite, pointing to src/lib/db/schema.ts, output to ./drizzle/migrations
+   - Add npm scripts:
+     "db:generate": "drizzle-kit generate"
+     "db:migrate": "tsx src/lib/db/migrate.ts"
+     "db:seed": "tsx src/lib/db/seed.ts"
+   - .gitignore must include data/ but NOT drizzle/
+
+2. DATABASE SCHEMA
+   Create src/lib/db/schema.ts with ALL five tables defined in IMPLEMENTATION.md:
+   accounts, transactions, categories, bill_reminders, budgets.
+   Follow the exact column definitions, types, and constraints from the doc.
+   All money values are INTEGER in cents. Dates are TEXT in ISO format.
+   Export table definitions AND inferred TypeScript types.
+
+3. DATABASE CONNECTION
+   Create src/lib/db/index.ts — a singleton that:
+   - Creates data/ directory if missing
+   - Opens data/closed-ledger.db with better-sqlite3
+   - Sets WAL journal mode and foreign_keys = ON
+   - Wraps with Drizzle ORM
+   - Exports the db instance
+
+4. MIGRATION RUNNER
+   Create src/lib/db/migrate.ts that runs pending Drizzle migrations.
+   Generate the initial migration with drizzle-kit generate.
+   Verify the migration runs without errors.
+
+5. SEED SCRIPT
+   Create src/lib/db/seed.ts matching the seed data spec in IMPLEMENTATION.md.
+   It must:
+   - Check if data exists already (skip if seeded, or clear and reseed)
+   - Insert categories first (full hierarchy from the doc)
+   - Insert accounts (all 13 accounts from the doc with correct initial balances)
+   - Insert 250+ transactions spanning the last 6 months using the exact payees
+     from the screenshots (Car Payment, ATM Withdrawal, Bo-bo- Chili And Ribs,
+     GameStop, Trader Joe's, etc.)
+   - Insert 6 bill reminders (Cable Bill, Car Insurance, Cell Phone, Credit Card Payment,
+     Internet Service, Transfer To Savings)
+   - Insert budgets for the current month
+   Run the seed script and verify data was inserted.
+
+6. LAYOUT SHELL
+   Build the three-panel layout visible in all Quicken screenshots:
+   - Root layout (src/app/layout.tsx): flex row, sidebar left + main right
+   - Sidebar (src/components/layout/Sidebar.tsx): 240px fixed width, light gray bg (#F5F5F5),
+     header with "ACCOUNTS" label, "All Transactions" link, placeholder account list,
+     "Net Worth" at bottom, "+ Add an Account" at very bottom. THIS IS JUST A SHELL —
+     Phase 2 will make it functional.
+   - Top nav (src/components/layout/TopNav.tsx): steel blue bar (#4A7AB5), white text,
+     tab items: HOME, SPENDING, BILLS, PLANNING, INVESTING, PROPERTY & DEBT, REPORTS.
+     Use Next.js Link. Active tab detection via usePathname.
+   - Global styles (src/styles/globals.css): Tailwind directives + CSS variables from
+     the color palette in IMPLEMENTATION.md
+
+7. ROUTE STUBS
+   Create placeholder pages that just show a centered message:
+   - src/app/page.tsx → "Dashboard coming in Phase 4"
+   - src/app/accounts/[id]/page.tsx → "Transaction Register coming in Phase 3"
+   - src/app/spending/page.tsx → "Spending analysis coming in Phase 5"
+   - src/app/bills/page.tsx → "Bills management coming in Phase 6"
+   - src/app/budgets/page.tsx → "Budget tracking coming in Phase 5"
+   - src/app/reports/page.tsx → "Reports coming in Phase 7"
+
+After building everything, run `npm run dev` and verify the app starts on localhost:3000.
 ```
 
-### Prompt 1.2: Database Schema
+### Step 2: Testing Checklist
+
+After Claude Code finishes, verify each of these yourself:
 
 ```
-Create the complete database schema in src/lib/db/schema.ts using Drizzle ORM for SQLite.
-
-Follow the exact schema defined in IMPLEMENTATION.md under "Data Model Deep Dive". Create all five tables:
-1. accounts — with type enum, group enum, initial_balance in cents, is_debt, is_hidden, sort_order
-2. transactions — with amount in cents (negative=payment, positive=deposit), category reference, transfer support
-3. categories — with parent_id for hierarchy, type enum (income/expense/transfer), is_system flag
-4. bill_reminders — with frequency enum, next_due_date, is_income, is_automatic
-5. budgets — with category reference, amount in cents, year, month
-
-Key requirements:
-- All monetary amounts are INTEGER type stored in cents
-- Dates are TEXT type in ISO format ('YYYY-MM-DD')
-- Use proper foreign key references between tables
-- Include created_at timestamps with default of current datetime
-- Export all table definitions and their inferred types (InferSelectModel, InferInsertModel)
-
-Then create the database connection singleton in src/lib/db/index.ts that:
-- Creates data/ directory if missing
-- Opens data/openledger.db
-- Sets WAL journal mode and foreign_keys = ON
-- Exports the drizzle db instance
-
-Then create src/lib/db/migrate.ts that runs Drizzle migrations.
-
-Finally, run drizzle-kit generate to create the initial migration, then verify the migration runs cleanly.
+□ npm run dev starts without errors
+□ http://localhost:3000 loads and shows the three-panel layout
+□ Sidebar is visible on the left (gray background, "ACCOUNTS" header)
+□ Top nav bar is visible (steel blue, tab items are clickable)
+□ Clicking tab items navigates to the correct routes with placeholder messages
+□ data/closed-ledger.db file exists after first run
+□ npm run db:seed runs without errors
+□ Database has data — run this in terminal:
+  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM accounts;"      → should return 13
+  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM categories;"    → should return 40+
+  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM transactions;"  → should return 200+
+  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM bill_reminders;" → should return 6
+□ Restarting npm run dev does NOT lose database data
+□ No TypeScript errors (run: npx tsc --noEmit)
 ```
 
-### Prompt 1.3: Seed Data
+**If something fails**, use the Fix Prompt Template above. Common Phase 1 issues:
+- `better-sqlite3` may need `node-gyp` / build tools — Claude Code should handle this
+- Drizzle config may need adjustment for the migration output path
+- Seed script may fail on foreign key ordering — categories must be inserted before transactions
 
-```
-Create the seed script at src/lib/db/seed.ts that populates the database with realistic demo data
-matching the Quicken screenshots described in IMPLEMENTATION.md.
+### Step 3: Commit
 
-The seed script should:
-1. Check if data already exists (don't double-seed)
-2. Clear all tables if re-seeding (in proper order to respect foreign keys)
-3. Insert in this order: categories, accounts, transactions, bill_reminders, budgets
-
-CATEGORIES — Create these hierarchical categories:
-
-Income categories:
-- Salary (income)
-- Net Salary Spouse (income)  
-- Interest Income (income)
-- Dividend Income (income)
-- Bonus (income)
-
-Expense categories (parent → children):
-- Food & Dining → Restaurants, Groceries, Coffee Shops
-- Auto & Transport → Auto Pay, Gas & Fuel, Insurance, Parking, Public Transit
-- Home → Mortgage, Rent, Home Services, Lawn & Garden, Home Improvement
-- Bills & Utilities → Electric, Gas, Water, Internet, Phone, Cable, Trash
-- Entertainment → Movies, Music, Games, Streaming
-- Health & Fitness → Gym, Doctor, Pharmacy, Dentist
-- Shopping → Clothing, Electronics, General
-- Cash & ATM (no children)
-- Personal Care (no children)
-- Education (no children)
-- Gifts & Donations (no children)
-- Travel (no children)
-- Taxes → Federal Tax, State Tax, Property Tax
-
-Transfer categories:
-- Transfer
-- Credit Card Payment
-
-ACCOUNTS — Create these accounts matching the screenshots:
-- Family Checking (checking, banking) - initial balance that results in ~$1,491 after transactions
-- My Checking (checking, banking) - ~$2,832
-- My Savings (savings, banking) - $13,200
-- My Credit Card (credit_card, banking, is_debt=true) - results in ~-$5,325
-- Brokerage (brokerage, investing) - $95,164
-- 401(k) (retirement_401k, investing) - $82,930
-- Car Value (vehicle, property_debt) - $20,000
-- House (property, property_debt) - $800,000
-- Auto Loan (loan, property_debt, is_debt=true) - -$18,288
-- Home Loan (mortgage, property_debt, is_debt=true) - -$283,043
-- Loan (loan, property_debt, is_debt=true) - -$339,924
-- Dream Home Fund (savings, savings_goals) - $4,050
-- Vacation Fund (savings, savings_goals) - $700
-
-TRANSACTIONS — Generate 250+ transactions on the Family Checking and My Checking accounts
-spanning the last 6 months. Use these exact payees from the screenshots:
-- Car Payment ($300, Auto & Transport:Auto Pay, monthly)
-- ATM Withdrawal ($120, Cash & ATM, ~biweekly)
-- Bo-bo- Chili And Ribs ($75, Food & Dining:Restaurants, ~biweekly)
-- GameStop ($12.50, Entertainment, ~monthly)
-- Trader Joe's ($100, Food & Dining:Groceries, ~weekly)
-- Credit Card Payment ($750, Credit Card Payment, monthly, transfer to My Credit Card)
-- Spouse Paycheck ($2,600, Net Salary Spouse, ~bimonthly, deposit)
-- Restaurant ($75, Food & Dining:Restaurants, ~biweekly)
-- Grocery Store ($100, Food & Dining:Groceries, ~weekly)
-- Gym Membership ($100, Health & Fitness:Gym, monthly)
-- Netflix ($12.50, Entertainment:Streaming, monthly)
-- Gas & Electric ($250, Bills & Utilities:Electric, monthly)
-- Mortgage Payment ($1,400, Home:Mortgage, monthly)
-- Water Bill ($10, Bills & Utilities:Water, monthly)
-- Yard Work ($25, Home:Lawn & Garden, monthly)
-- Garden Bill ($12.50, Home:Home Services, monthly)
-- Paycheck deposits (~$3,500, Salary, biweekly, deposit on My Checking)
-
-Also generate some transactions on the credit card (Trader Joe's, restaurants, gas, etc.)
-
-BILL REMINDERS — Create these monthly bills:
-- Cable Bill ($150, Bills & Utilities:Cable, monthly, due 21st)
-- Car Insurance ($150, Auto & Transport:Insurance, monthly, due 21st)
-- Cell Phone ($90, Bills & Utilities:Phone, monthly, due 21st)
-- Credit Card Payment ($750, Credit Card Payment, monthly, due 21st)
-- Internet Service ($65, Bills & Utilities:Internet, monthly, due 21st)
-- Transfer To Savings ($200, Transfer, monthly, due 21st)
-
-BUDGETS — Create monthly budgets for the current month:
-- Food & Dining: $600
-- Auto & Transport: $500
-- Bills & Utilities: $600
-- Entertainment: $150
-- Health & Fitness: $150
-- Shopping: $200
-- Home: $1,600
-
-Run the seed script and verify data was inserted correctly.
-```
-
-### Prompt 1.4: Layout Shell
-
-```
-Create the root application layout and basic navigation structure.
-
-ROOT LAYOUT (src/app/layout.tsx):
-- HTML with system font stack, 14px base font size
-- Body has flex row layout: sidebar on left, main content on right
-- Sidebar is a fixed-width 240px panel on the left, full viewport height
-- Main content area fills remaining width, flex column with top nav + scrollable content
-- Import global styles from styles/globals.css
-
-GLOBAL STYLES (src/styles/globals.css):
-- Tailwind directives (@tailwind base, components, utilities)
-- Custom CSS variables for the Quicken color palette defined in IMPLEMENTATION.md
-- Base styles: box-sizing border-box, smooth scrolling
-- Scrollbar styling for the sidebar (thin, subtle)
-
-SIDEBAR PLACEHOLDER (src/components/layout/Sidebar.tsx):
-- Light gray background (#F5F5F5)
-- Header area: "ACCOUNTS" label with sync, add (+), and settings (⚙) icon buttons
-- "All Transactions" link
-- Placeholder text: "Accounts will appear here"
-- Bottom: "Net Worth" label with placeholder value
-- Bottom: "+ Add an Account" link
-- This will be fully built in Phase 2 — just create the shell now
-
-TOP NAVIGATION (src/components/layout/TopNav.tsx):
-- Steel blue background (#4A7AB5)
-- Tab items as links: HOME, SPENDING, BILLS, PLANNING, INVESTING, PROPERTY & DEBT, REPORTS
-- Active tab has white bottom border or slightly lighter background
-- Use Next.js Link component with usePathname for active detection
-- HOME links to /, SPENDING to /spending, BILLS to /bills, REPORTS to /reports, etc.
-
-ROUTE STUBS — Create placeholder pages for each route:
-- src/app/page.tsx (Home) — "Dashboard coming in Phase 4"
-- src/app/accounts/[id]/page.tsx — "Transaction Register coming in Phase 3"
-- src/app/spending/page.tsx — "Spending coming in Phase 5"
-- src/app/bills/page.tsx — "Bills coming in Phase 6"
-- src/app/budgets/page.tsx — "Budgets coming in Phase 5"
-- src/app/reports/page.tsx — "Reports coming in Phase 7"
-
-Each placeholder should render a centered message in the content area. The sidebar and top nav
-should be visible on all pages.
-
-Verify the app runs with `npm run dev` and all routes work.
+```bash
+git add -A
+git commit -m "Phase 1: Foundation — project setup, schema, seed data, layout shell"
 ```
 
 ---
 
 ## Phase 2: Account Sidebar
 
-### Prompt 2.1: Account Queries & Sidebar Data
+> **Goal**: The sidebar becomes fully functional with real account balances, collapsible groups, net worth, and account CRUD.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Build the server-side data layer for the account sidebar, then implement the full Sidebar component.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for the full architecture and data model.
 
-QUERY FUNCTIONS (src/lib/db/queries/accounts.ts):
-Create these reusable query functions:
+Phase 1 is complete: the project has a running Next.js app, SQLite database with Drizzle ORM,
+seeded data (13 accounts, 250+ transactions, categories, bill reminders), and a layout shell
+with a placeholder sidebar and top navigation.
 
-1. getAccountsWithBalances() — Returns all non-hidden accounts with computed current balance:
-   SELECT a.*, (a.initial_balance + COALESCE(SUM(t.amount), 0)) as current_balance
-   FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id
-   WHERE a.is_hidden = 0 GROUP BY a.id ORDER BY a.group, a.sort_order, a.name
+Now execute Phase 2 — Account Sidebar. Here's everything to build:
 
-2. getAccountGroups() — Calls getAccountsWithBalances() and groups accounts by their `group` field.
-   Returns an array of { group: string, label: string, accounts: Account[], total: number }
-   Group labels: banking → "Banking", investing → "Investing", property_debt → "Property & Debt", savings_goals → "Savings Goals"
+1. ACCOUNT QUERY FUNCTIONS (src/lib/db/queries/accounts.ts)
+   Create reusable server-side query functions:
+   - getAccountsWithBalances(): returns all non-hidden accounts with computed current balance.
+     Balance = initial_balance + SUM(transactions.amount). Use LEFT JOIN so accounts with
+     zero transactions still show. Order by group, sort_order, name.
+   - getAccountGroups(): calls getAccountsWithBalances(), groups them by `group` field,
+     returns array of { group, label, accounts, total }. Group labels:
+     banking→"Banking", investing→"Investing", property_debt→"Property & Debt",
+     savings_goals→"Savings Goals"
+   - getNetWorth(): sum of all account current balances
+   - getAccountById(id): single account with current balance
 
-3. getNetWorth() — Sum of all account balances (current_balance from getAccountsWithBalances)
+2. SIDEBAR COMPONENT (src/components/layout/Sidebar.tsx)
+   Replace the placeholder sidebar with a fully functional server component:
+   - Header: "ACCOUNTS" bold text with RefreshCw, Plus, Settings icons (from lucide-react)
+   - "All Transactions" link (routes to /accounts/all)
+   - For each account group: an AccountGroup client component
+   - Net Worth at the bottom: "Net Worth" label with formatted total right-aligned
+   - "+ Add an Account" link at the very bottom
 
-4. getAccountById(id) — Single account with current balance
+3. ACCOUNT GROUP COMPONENT (src/components/accounts/AccountGroup.tsx)
+   Client component ("use client") for expand/collapse:
+   - Group header row: ▼/▶ disclosure triangle, group label (bold), total balance (right-aligned)
+   - Clicking header toggles the children list
+   - Each child: account name (indented, regular weight) linked to /accounts/[id], balance right-aligned
+   - Negative balances in red text (credit cards, loans, mortgages)
+   - Active account highlighted with light blue background (detect via usePathname)
+   - Default state: expanded
 
-SIDEBAR COMPONENT (src/components/layout/Sidebar.tsx):
-Replace the placeholder with the full sidebar implementation. This is a SERVER COMPONENT.
+4. CURRENCY COMPONENT (src/components/shared/Currency.tsx)
+   - Takes amount in cents, formats for display
+   - Negative: red text, "-$5,325" format
+   - Positive: default color, "$13,200" format
+   - Use Intl.NumberFormat for comma separators
+   - Optional prop to show/hide cents (sidebar balances typically show whole dollars,
+     transaction register shows cents)
 
-Structure:
-- Header: "ACCOUNTS" in bold, with Lucide icons for RefreshCw (sync), Plus (add account), Settings
-- "All Transactions" link (navigates to /accounts/all)
-- For each account group from getAccountGroups():
-  - AccountGroup component (client component for collapse/expand state)
-  - Group header: disclosure triangle (▼/▶), group label in bold, group total right-aligned
-  - Account list: indented account names with balance right-aligned
-  - Each account is a link to /accounts/[id]
-- Net Worth at bottom: "Net Worth" label + formatted total
-- "+ Add an Account" link at very bottom
+5. ADD ACCOUNT MODAL
+   - Reusable Modal component (src/components/shared/Modal.tsx): backdrop overlay, centered card,
+     close on X/Escape/backdrop click, client component with portal
+   - AccountForm component (src/components/accounts/AccountForm.tsx): client component with fields:
+     Account Name (required), Account Type (dropdown with all types), Institution (optional),
+     Opening Balance (currency input in dollars, converts to cents). Auto-sets group and isDebt
+     from the type using the mapping in IMPLEMENTATION.md.
+   - API route POST /api/accounts: creates account, returns it
+   - API route GET /api/accounts: returns all accounts with balances
+   - Wire "+ Add an Account" to open the modal
+   - After creation, use router.refresh() to update the sidebar
 
-ACCOUNT GROUP COMPONENT (src/components/accounts/AccountGroup.tsx):
-- Client component ("use client") for collapse/expand state
-- Default to expanded
-- Click group header to toggle
-- Smooth collapse animation (optional, simple height transition is fine)
+6. EDIT & DELETE
+   - Small pencil icon appears on hover next to account names in sidebar
+   - Clicking opens the AccountForm in edit mode (pre-filled)
+   - API route PUT /api/accounts/[id]: updates account
+   - API route DELETE /api/accounts/[id]: deletes only if no transactions exist, else return error
+   - After edit/delete, refresh sidebar
 
-CURRENCY DISPLAY COMPONENT (src/components/shared/Currency.tsx):
-- Takes amount in cents and formats to display currency
-- Negative values: red text, with negative sign before dollar sign (e.g., -$5,325)
-- Positive values: default text color
-- Format: $X,XXX or $X,XXX.XX (always show cents for transaction amounts, optionally hide for sidebar balances)
-- Use Intl.NumberFormat for locale-aware formatting
-
-Highlight the active account in the sidebar using the current URL pathname.
-Verify all balances match the expected values from the seed data.
+Verify that all account balances in the sidebar are correct by cross-referencing with the
+seed data. The net worth should match the sum of all account balances.
 ```
 
-### Prompt 2.2: Add Account Modal
+### Step 2: Testing Checklist
 
 ```
-Create the "Add an Account" modal that opens when clicking "+ Add an Account" in the sidebar.
+□ Sidebar shows four account groups: Banking, Investing, Property & Debt, Savings Goals
+□ Each group has a total balance that matches the sum of its accounts
+□ Account balances match expected values from seed data:
+  Family Checking: ~$1,491  |  My Checking: ~$2,832  |  My Savings: $13,200
+  My Credit Card: ~-$5,325  |  Brokerage: $95,164  |  401(k): $82,930
+  (Exact values depend on seed transactions — just verify they're reasonable, not $0)
+□ Negative balances (credit card, loans, mortgage) display in red
+□ Clicking a group header collapses/expands the account list
+□ Clicking an account name navigates to /accounts/[id]
+□ The active account is highlighted in the sidebar
+□ "All Transactions" link navigates to /accounts/all
+□ Net Worth at bottom = sum of all account balances
+□ "+ Add an Account" opens a modal
+□ Creating a new account (e.g., "Test Savings", type: savings, balance: $1000):
+  - Modal closes after submit
+  - New account appears in sidebar under Banking
+  - Balance shows $1,000
+□ Edit icon appears on hover, opens pre-filled form
+□ Delete works for accounts with no transactions, shows error for accounts with transactions
+□ No console errors
+```
 
-MODAL COMPONENT (src/components/shared/Modal.tsx):
-- Reusable modal with backdrop overlay (semi-transparent black)
-- Centered content card with rounded corners, shadow
-- Close button (X) in top right
-- Click backdrop to close
-- Escape key to close
-- Client component with portal to document.body
+### Step 3: Commit
 
-ACCOUNT FORM (src/components/accounts/AccountForm.tsx):
-- Client component for form state management
-- Fields:
-  1. Account Name (text input, required)
-  2. Account Type (select dropdown with all types from the schema)
-  3. Financial Institution (text input, optional, e.g., "Chase", "Fidelity")
-  4. Opening Balance (currency input, required, default $0.00)
-     - Input should accept decimal dollar amounts and convert to cents for storage
-- Auto-set the `group` and `is_debt` fields based on the selected account type
-  (use the mapping table from IMPLEMENTATION.md)
-- Submit button: "Add Account"
-- Cancel button: closes modal
-
-API ROUTE (src/app/api/accounts/route.ts):
-- POST: Create a new account. Accept JSON body with name, type, institution, initialBalance.
-  Auto-compute group and isDebt from type. Insert into accounts table. Return the new account.
-- GET: Return all accounts with balances (for client-side refresh if needed).
-
-Wire the "+ Add an Account" link in the sidebar to open this modal.
-After successful creation, refresh the sidebar (use router.refresh() or revalidatePath).
-
-Also create an edit mode for the form that pre-fills fields when editing an existing account.
-Add a small edit (pencil) icon next to account names in the sidebar that opens the edit modal.
-
-API ROUTE for single account:
-- src/app/api/accounts/[id]/route.ts
-- PUT: Update account fields
-- DELETE: Delete account (only if it has no transactions, otherwise return error)
+```bash
+git add -A
+git commit -m "Phase 2: Account Sidebar — live balances, groups, CRUD, net worth"
 ```
 
 ---
 
 ## Phase 3: Transaction Register
 
-### Prompt 3.1: Transaction Data Layer
+> **Goal**: The core data entry interface — a spreadsheet-like transaction table with CRUD, inline editing, filtering, and running balance. This is the biggest phase.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Build the server-side queries and API routes for transactions.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for the full architecture, data model, and UI specs.
 
-QUERY FUNCTIONS (src/lib/db/queries/transactions.ts):
+Phase 1–2 are complete: the app has a running database, seeded data, and a fully functional
+sidebar with real account balances, collapsible groups, and account CRUD.
 
-1. getTransactionsForAccount(accountId, filters?) — Returns all transactions for an account with:
-   - Category name (joined, formatted as "Parent:Child")
-   - Running balance (computed via window function or application-level accumulation)
-   - Sorted by date ASC, then id ASC
-   - Optional filters: dateRange (start/end), type (payment/deposit/transfer/check), reconciled status
-   - For "all" accounts view: return transactions across all accounts
+Now execute Phase 3 — Transaction Register. This is the most important page in the app.
+It must closely match the transaction register from the Quicken screenshots described in
+IMPLEMENTATION.md under "Phase 3: Transaction Register" and "UI Reference Notes."
 
-2. getTransactionById(id) — Single transaction with category info
+Build ALL of the following:
 
-3. getPayeeSuggestions(query) — Return distinct payee names matching a prefix for autocomplete
+1. TRANSACTION QUERIES (src/lib/db/queries/transactions.ts)
+   - getTransactionsForAccount(accountId, filters?): returns transactions with category name
+     (joined as "Parent:Child" format) and running balance. Sorted by date ASC, id ASC.
+     Running balance = account.initialBalance + cumulative sum of amounts.
+     Filters: dateRange {start, end}, type (payment/deposit/transfer), reconciled (boolean).
+     For accountId="all": return all transactions across all accounts (no running balance).
+   - getTransactionById(id): single transaction with category info
+   - getPayeeSuggestions(query): distinct payee names matching prefix, for autocomplete
+   - getTransactionStats(accountId): { count, currentBalance, endingBalance } for the status bar
 
-4. getTransactionStats(accountId) — Returns { count, currentBalance, endingBalance } for the status bar
+2. CATEGORY QUERIES (src/lib/db/queries/categories.ts)
+   - getAllCategories(): all categories with parent name, formatted as "Parent:Child" display string
+   - getCategoryTree(): hierarchical tree for dropdown (groups children under parents)
 
-Computing running balance server-side:
-```sql
-WITH ordered AS (
-  SELECT t.*, ROW_NUMBER() OVER (ORDER BY t.date, t.id) as rn
-  FROM transactions t WHERE t.account_id = ?
-)
-SELECT *, 
-  (SELECT a.initial_balance FROM accounts a WHERE a.id = ?) + 
-  SUM(amount) OVER (ORDER BY date, id ROWS UNBOUNDED PRECEDING) as running_balance
-FROM ordered
-```
-If this SQL window function approach doesn't work well with better-sqlite3/Drizzle, 
-compute running balances in the application layer after fetching sorted transactions.
+3. API ROUTES
+   - GET /api/transactions?accountId=X&dateStart=Y&dateEnd=Z&type=T
+   - POST /api/transactions: create transaction. Validate accountId, date, amount required.
+     If transferAccountId is provided, create paired transaction on other account.
+   - PUT /api/transactions/[id]: update transaction. If transfer, update paired transaction too.
+   - DELETE /api/transactions/[id]: delete transaction. If transfer, delete pair.
+   - GET /api/categories: all categories in tree structure
 
-API ROUTES (src/app/api/transactions/route.ts):
-- GET: List transactions with query params (accountId, dateStart, dateEnd, type, search)
-- POST: Create transaction. Validate required fields (accountId, date, amount).
-  If it's a transfer (transferAccountId provided), create the paired transaction on the other account.
+4. TRANSACTION REGISTER PAGE (src/app/accounts/[id]/page.tsx)
+   Server component that:
+   - Fetches account info (name for header) and transactions with running balances
+   - Renders: account name as page header (e.g., "Family Checking"), FilterBar, TransactionTable, StatusBar
+   - Handles id="all" as a special case showing all transactions
 
-API ROUTES (src/app/api/transactions/[id]/route.ts):
-- GET: Single transaction
-- PUT: Update transaction. If it's a transfer, also update the paired transaction.
-- DELETE: Delete transaction. If it's a transfer, also delete the paired transaction.
+5. FILTER BAR (src/components/transactions/FilterBar.tsx)
+   Client component. Three select dropdowns + Reset button in a horizontal row:
+   - Date Range: All Dates, This Month, Last Month, This Year, Last Year, Last 12 Months
+   - Type: Any Type, Payment, Deposit, Transfer
+   - Status: All Transactions, Unreconciled, Reconciled
+   - Reset button clears all to defaults
+   - Filters update URL search params (so they survive refresh)
+   - Styled compactly matching the screenshots
 
-CATEGORY QUERIES (src/lib/db/queries/categories.ts):
-1. getAllCategories() — All categories with parent info, formatted as "Parent:Child" display names
-2. getCategoryTree() — Hierarchical tree structure for the category picker dropdown
-```
+6. TRANSACTION TABLE (src/components/transactions/TransactionTable.tsx)
+   Client component. Columns matching IMPLEMENTATION.md Phase 3 exactly:
+   Status icon (30px) | Flag (24px) | Date (95px) | Check # (65px) | Payee (flex) |
+   Memo (150px) | Category (200px) | Tag (80px) | Payment (95px, right) | Deposit (95px, right) |
+   Balance (105px, right)
+   - Alternating row colors: white and #F0F5FA
+   - Header row: light gray background, bold text
+   - Currency in table: NO $ sign, just "300.00" and "3,556.31" (monospace/tabular-nums)
+   - Date format: M/D/YYYY
 
-### Prompt 3.2: Transaction Register Page
+7. INLINE EDITING (src/components/transactions/TransactionRow.tsx)
+   - Click a row → entire row becomes editable (all fields become inputs)
+   - Date: date input. Payee: text input with autocomplete from existing payees.
+     Category: searchable dropdown showing "Parent:Child" hierarchy.
+     Payment/Deposit: number input (dollars, converts to cents on save).
+   - Enter or click-away saves via PUT /api/transactions/[id]
+   - Escape cancels
+   - Tab moves between fields within the row
+   - Only ONE of Payment or Deposit should have a value (entering one clears the other)
+   - Delete icon (trash) appears on row hover, with confirmation popover
 
-```
-Build the transaction register page at src/app/accounts/[id]/page.tsx.
+8. NEW TRANSACTION ROW
+   Always visible as the last row, slightly different styling (e.g., light yellow bg or dashed border).
+   Fields are always in input mode. Date defaults to today.
+   Enter/Tab on last field creates transaction via POST and clears the row for the next entry.
 
-This is the most important and most complex page in the application. It must match the layout
-from Screenshot 1 (described in IMPLEMENTATION.md under "UI Reference Notes").
+9. STATUS BAR (src/components/layout/StatusBar.tsx)
+   Fixed at bottom of content area. Three sections:
+   Left: "{N} Transactions" | Center: "Current Balance: X,XXX.XX" | Right: "Ending Balance: X,XXX.XX"
+   Subtle top border, 12px font.
 
-PAGE COMPONENT (src/app/accounts/[id]/page.tsx):
-- Server component that fetches account info and transactions
-- Page header: Account name in large text (e.g., "Family Checking")
-- Below header: FilterBar component
-- Below filter bar: TransactionTable component
-- Below table: StatusBar component
-- Handle the special case where id = "all" to show all transactions across accounts
+10. CATEGORY PICKER (src/components/shared/CategoryPicker.tsx)
+    Searchable dropdown for selecting categories:
+    - Typing filters the list
+    - Parent categories shown as group headers (bold, not selectable)
+    - Child categories shown indented below parents (selectable)
+    - Selected value displays as "Parent:Child" text
 
-FILTER BAR (src/components/transactions/FilterBar.tsx):
-- Client component ("use client")
-- Three select dropdowns in a horizontal row + Reset button:
-  1. Date Range: All Dates, This Month, Last Month, This Year, Last Year, Last 12 Months, Custom Range
-  2. Type: Any Type, Payment, Deposit, Transfer, Check
-  3. Status: All Transactions, Unreconciled, Reconciled
-- Reset button clears all filters to defaults
-- Filters should update URL search params so they survive page refresh
-- Style: compact, matches the screenshot with bordered dropdowns
-
-TRANSACTION TABLE (src/components/transactions/TransactionTable.tsx):
-- Client component for interactivity
-- Table with these columns (matching Screenshot 1 exactly):
-  | Column | Width | Align | Notes |
-  |--------|-------|-------|-------|
-  | Status icon | 30px | center | Reconciled checkmark or scheduled clock |
-  | Flag | 24px | center | Red flag toggle |
-  | Date | 95px | left | M/D/YYYY format |
-  | Check # | 65px | left | Usually empty |
-  | Payee | flex | left | Primary field, takes remaining space |
-  | Memo | 150px | left | Secondary description |
-  | Category | 200px | left | "Parent:Child" format |
-  | Tag | 80px | left | Optional tag |
-  | Payment | 95px | right | Amount if expense (no $ sign, just "300.00") |
-  | Deposit | 95px | right | Amount if income |
-  | Balance | 105px | right | Running balance |
-
-- Alternating row colors: white and light blue (#F0F5FA)
-- Table header row: light gray background, bold text, bottom border
-- Numbers in Payment/Deposit/Balance columns: monospace or tabular-nums font feature
-- Balance column shows running balance
-- Click on the Date column header to toggle sort direction (default: ascending with ▲ indicator)
-
-TRANSACTION ROW (src/components/transactions/TransactionRow.tsx):
-- Default: display mode — shows formatted data in each cell
-- Click on a row to enter edit mode:
-  - Date becomes a date input
-  - Payee becomes a text input with autocomplete
-  - Memo becomes a text input
-  - Category becomes a searchable select/dropdown
-  - Payment/Deposit becomes a number input
-  - Check # becomes a text input
-  - Tag becomes a text input
-- Enter or clicking outside saves changes via PUT /api/transactions/[id]
-- Escape cancels edit mode
-- Delete button appears on hover (trash icon at far right)
-
-NEW TRANSACTION ROW:
-- Always visible as the last row of the table
-- Styled slightly differently (maybe a light yellow background or dashed top border)
-- Fields are always in input mode
-- Date defaults to today
-- Submitting (Enter or Tab past last field) creates the transaction via POST and clears the row
-
-STATUS BAR (src/components/layout/StatusBar.tsx):
-- Fixed at the bottom of the content area
-- Three sections: left, center, right
-- Left: "{N} Transactions"
-- Center: "Current Balance: {balance}" (the computed balance)
-- Right: "Ending Balance: {balance}" (balance of the last transaction in the register)
-- Subtle top border, small font size (12px)
-
-CATEGORY PICKER:
-- Dropdown/combobox for selecting categories
-- Searchable: typing filters the list
-- Shows hierarchy: parent categories as group headers, child categories indented below
-- Creating a transaction with a category like "Food & Dining:Restaurants" should link to the child category
-
-This is a large prompt. Focus on getting the table rendering correctly with real data first,
-then add inline editing, then the new transaction row. Iterate.
+After building, verify with seed data that the Family Checking register shows all its transactions
+with correct running balances and that the status bar numbers are accurate.
 ```
 
-### Prompt 3.3: Transaction Register Polish
+### Step 2: Testing Checklist
 
 ```
-Polish the transaction register from the previous step. Focus on these specific items:
+□ Navigating to /accounts/[family-checking-id] shows the register
+□ Page header shows "Family Checking"
+□ Table displays all transactions for that account
+□ Columns are correct: Date, Check#, Payee, Memo, Category, Tag, Payment, Deposit, Balance
+□ Date format is M/D/YYYY (not MM/DD/YYYY or ISO)
+□ Currency in table has no $ sign, just "300.00" format
+□ Alternating row colors (white and light blue)
+□ Running balance is correct:
+  - First transaction balance = initial balance + first transaction amount
+  - Each subsequent balance = previous balance + current amount
+  - LAST row balance matches the account balance shown in the sidebar
+□ Status bar shows correct transaction count and balance values
+□ FILTER: Selecting "This Month" filters to current month's transactions only
+□ FILTER: Selecting "Payment" shows only expense transactions
+□ FILTER: Reset button restores defaults
+□ INLINE EDIT: Clicking a row makes it editable
+□ INLINE EDIT: Changing the payee and pressing Enter saves the change
+□ INLINE EDIT: Escape cancels without saving
+□ NEW TRANSACTION: Typing in the bottom row and pressing Enter creates a new transaction
+□ NEW TRANSACTION: After creation, the new row appears in the table and sidebar balance updates
+□ DELETE: Trash icon appears on hover, clicking shows confirmation, confirming deletes the row
+□ Category picker shows hierarchical categories and is searchable
+□ "All Transactions" (/accounts/all) shows transactions from all accounts
+□ No console errors
+```
 
-1. PAYEE AUTOCOMPLETE:
-   - When typing in the Payee field (edit mode or new transaction row), show a dropdown
-     with matching payee names from previous transactions
-   - Fetch suggestions from GET /api/transactions/suggestions?q=<prefix>
-   - Arrow keys to navigate, Enter to select, Escape to dismiss
+### Step 3: Commit
 
-2. CURRENCY INPUT HANDLING:
-   - The Payment and Deposit fields should accept decimal dollar amounts (e.g., "75.00" or "75")
-   - On save, convert to cents for storage
-   - On display, convert from cents to formatted string (no $ sign in the table, just "1,400.00")
-   - Only one of Payment/Deposit should have a value. If user types in Payment, clear Deposit and vice versa.
-   - Tabbing from Payment to Deposit should move focus, not duplicate the value
-
-3. TRANSFER HANDLING:
-   - If category is "Transfer" or "Credit Card Payment", show an additional dropdown to select
-     the destination/source account
-   - Creating a transfer should create paired transactions on both accounts
-   - Display transfer transactions with the other account name in brackets, e.g., "[My Credit Card]"
-     in the Category column
-
-4. DELETE CONFIRMATION:
-   - Clicking the delete (trash) icon shows a small confirmation popover: "Delete this transaction? [Yes] [No]"
-   - Deleting a transfer deletes both paired transactions
-
-5. DATE INPUT:
-   - Date field should use a native date input or a lightweight date picker
-   - Should display as M/D/YYYY in view mode but use a proper date picker in edit mode
-
-6. KEYBOARD NAVIGATION:
-   - Tab through fields in a row: Date → Check # → Payee → Memo → Category → Tag → Payment → Deposit
-   - Enter on the last field saves and moves to a new blank row
-   - Up/Down arrows move between rows (if not in edit mode)
-
-Verify the register works correctly with the seed data. Check that running balances are accurate.
+```bash
+git add -A
+git commit -m "Phase 3: Transaction Register — table, CRUD, filters, running balance"
 ```
 
 ---
 
 ## Phase 4: Home Dashboard
 
-### Prompt 4.1: Dashboard Data Layer
+> **Goal**: The landing page with spending chart, bill reminders, and budget summary.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Build the server-side queries for the home dashboard.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for full context, particularly the Phase 4 and UI Reference sections.
 
-QUERY FUNCTIONS (src/lib/db/queries/dashboard.ts):
+Phases 1–3 are complete: the app has a database with seeded data, a functional sidebar with
+real balances, and a full transaction register with inline editing, filtering, and running balances.
 
-1. getSpendingByCategory(dateStart, dateEnd) — Returns spending grouped by top-level category:
-   SELECT c_parent.name as category, c_parent.id as category_id,
-          ABS(SUM(t.amount)) as total
-   FROM transactions t
-   JOIN categories c ON t.category_id = c.id
-   LEFT JOIN categories c_parent ON c.parent_id = c_parent.id
-   WHERE t.amount < 0 
-     AND t.date BETWEEN ? AND ?
-     AND c.type = 'expense'
-   GROUP BY COALESCE(c_parent.id, c.id)
-   ORDER BY total DESC
-   
-   Return objects with: { category: string, total: number (in cents), color: string }
-   Map category names to colors from the palette in IMPLEMENTATION.md.
+Now execute Phase 4 — Home Dashboard. This replaces the placeholder at src/app/page.tsx.
 
-2. getUpcomingBills(daysAhead) — Returns bill reminders due within the next N days:
-   SELECT * FROM bill_reminders 
-   WHERE next_due_date <= date('now', '+' || ? || ' days')
-   ORDER BY next_due_date ASC
-   Include status: 'overdue' if next_due_date < today, 'due_soon' if within 7 days, 'upcoming' otherwise.
+Build ALL of the following:
 
-3. getTotalSpending(dateStart, dateEnd) — Sum of all expense transactions in range
+1. DASHBOARD QUERIES (src/lib/db/queries/dashboard.ts)
+   - getSpendingByCategory(dateStart, dateEnd): aggregate expense transactions (amount < 0)
+     by TOP-LEVEL category (if a transaction has a child category like "Food & Dining:Restaurants",
+     group it under the parent "Food & Dining"). Exclude transfers. Return array of
+     { category, total (in cents, as positive number), color }. Map categories to the color
+     palette defined in IMPLEMENTATION.md under "Category Color Mapping."
+   - getUpcomingBills(daysAhead): bill reminders where next_due_date is within the next N days.
+     Include computed status: 'overdue' if past due, 'due_soon' if within 7 days, 'upcoming' otherwise.
+   - getTotalSpending(dateStart, dateEnd): sum of all expense transactions in the range
+   - getWhatsLeft(): total budgeted for current month minus total expenses this month
 
-4. getWhatsLeft() — Budget remaining for the current month:
-   Total budgeted income - total expenses this month so far
-   Or: sum of all checking/savings account balances if no budgets set
+2. DASHBOARD PAGE (src/app/page.tsx)
+   Server component. Page title: "Overview". Three card sections stacked vertically:
 
-5. getMonthlySpendingTotal(dateStart, dateEnd) — Simple sum of negative transactions (expenses)
+   SECTION A — SPENDING BY CATEGORY
+   - Card header: "Spending By Category" left-aligned, total dollar amount right-aligned
+   - Date range dropdown in header: "Last Month (MMM)", "This Month", "Last 30 Days",
+     "Last 3 Months", "This Year" — defaults to "Last Month"
+   - Donut chart (Recharts PieChart with innerRadius for the hole)
+   - Center of donut: "TOTAL SPENDING" label + dollar amount (e.g., "$3,954")
+   - Right side: legend with category name + color swatch for each segment
+   - If no expense data in range, show "No spending data for this period"
+
+3. SPENDING CHART COMPONENT (src/components/dashboard/SpendingChart.tsx)
+   Client component ("use client") — Recharts requires it.
+   - PieChart with Pie component, innerRadius ~60% of outerRadius
+   - Each Cell colored by the category's assigned color
+   - Tooltip on hover showing category name and dollar amount
+   - Custom center label (absolutely positioned text over the chart center)
+   - ResponsiveContainer wrapper for responsive sizing
+   - Date range selector triggers re-fetch of data
+
+4. BILL REMINDERS WIDGET (src/components/dashboard/BillReminders.tsx)
+   - Card header: "Bill & Income Reminders" with dropdown: "Next 7 Days", "Next 14 Days", "Next 30 Days"
+   - "TODAY" badge with current date (e.g., "TODAY Feb 16")
+   - List of bills: status icon, bill name, "Due in X days" or "Overdue by X days", amount in red
+   - Status icon: red alert circle for overdue, orange clock for due soon, gray clock for upcoming
+   - Amounts formatted as -$XXX.XX in red
+   - If no bills in range: "No upcoming bills"
+
+5. BUDGET SUMMARY WIDGET (src/components/dashboard/BudgetSummary.tsx)
+   - Card header: "Budget"
+   - Large number: "$X,XXX left" in green if positive, red if negative
+   - Subtitle: "in All Categories"
+   - If no budgets exist: "Set up your budget →" link to /budgets
+
+Make sure the dashboard loads with real data from the seed. The spending chart should show
+actual spending from the seeded transactions. The bill reminders should show the 6 seeded bills.
 ```
 
-### Prompt 4.2: Dashboard Page
+### Step 2: Testing Checklist
 
 ```
-Build the home dashboard page at src/app/page.tsx matching Screenshots 2 and 3.
+□ Home page (/) shows "Overview" title with three card sections
+□ Spending donut chart renders with colored segments
+□ Total spending amount appears in the center of the donut
+□ Legend on the right shows category names with color swatches
+□ Changing the date range dropdown updates the chart data
+□ Bill reminders section shows the 6 seeded bills with correct amounts
+□ Bill due dates are reasonable ("Due in X days" or "Overdue by X days")
+□ Overdue bills show red indicator, due-soon bills show orange
+□ Budget summary shows a dollar amount or "Set up your budget" link
+□ Date range dropdown for bills (Next 7/14/30 days) changes the visible bills
+□ All dollar amounts are properly formatted with commas and $ signs
+□ Chart colors are consistent (Home=green, Food=orange, etc.)
+□ No console errors
+□ Dashboard loads fast (under 2 seconds)
+```
 
-PAGE LAYOUT:
-- Page title: "Overview" (large heading)
-- Sections stacked vertically with spacing between them
+### Step 3: Commit
 
-SECTION 1: SPENDING BY CATEGORY
-- Card/panel with header "Spending By Category"
-- Top right of header: total dollar amount (e.g., "$4,463.49") and date range dropdown
-- Date range dropdown: "Last Month (MMM)", "This Month", "Last 30 Days", "Last 3 Months", "This Year"
-- Donut chart (Recharts PieChart with inner radius):
-  - Hole in the center showing "TOTAL SPENDING" label and dollar amount
-  - Each segment colored by category using the consistent color palette
-  - Legend on the right side showing category names with color swatches
-- "Examine Your Spending" button below chart that links to /spending
-
-DONUT CHART COMPONENT (src/components/dashboard/SpendingChart.tsx):
-- Client component (Recharts requires "use client")
-- Use Recharts: <PieChart>, <Pie>, <Cell>, <Tooltip>, <Legend>
-- Inner radius = 60% of outer radius (to create the donut hole)
-- Custom center label using Recharts' built-in customization or positioned absolutely
-- Responsive: chart should resize with its container
-- Tooltip shows category name and dollar amount on hover
-- If no data, show an empty state message
-
-SECTION 2: BILL & INCOME REMINDERS
-- Card/panel with header "Bill & Income Reminders"
-- Top right: date range dropdown ("Next 7 Days", "Next 14 Days", "Next 30 Days")
-- "TODAY" marker with current date formatted as "MMM DD"
-- List of bills:
-  - Each row: status icon (clock for upcoming, red alert for overdue, "Auto" badge for automatic), 
-    bill name, "Due in X days" or "Overdue by X days", amount in red
-  - Amounts formatted as -$XXX.XX in red
-  - If no bills in range, show "No upcoming bills" message
-
-BILL REMINDERS COMPONENT (src/components/dashboard/BillReminders.tsx):
-- Client component for the date range selector
-- Fetch bill data server-side and pass as props, or use a client-side fetch
-- Color coding: overdue = red text/icon, due within 3 days = orange, otherwise gray
-- Show the bill name, due date description, and amount
-
-SECTION 3: BUDGET SUMMARY (WHAT'S LEFT)
-- Card/panel with header "Budget"
-- Large display: "$X,XXX left" in green (or red if overspent)
-- Subtitle: "in All Categories / All accounts"
-- Computed from: total budget for the month minus total expenses this month
-- If no budgets are set, show "Set up your budget" with a link to /budgets
-
-The dashboard should use server components where possible, with client components only for
-the chart and interactive dropdowns. Use async server components to fetch data.
-
-Make sure the layout is clean and matches the Quicken aesthetic: cards with subtle borders,
-proper spacing, consistent typography.
+```bash
+git add -A
+git commit -m "Phase 4: Home Dashboard — spending chart, bill reminders, budget summary"
 ```
 
 ---
 
 ## Phase 5: Categories & Budgets
 
-### Prompt 5.1: Category Management
+> **Goal**: Category management and monthly budget tracking with budget vs. actual views.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Build the category management interface.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for full context.
 
-This can be accessed from a /categories route or as a modal/panel.
+Phases 1–4 are complete: running app with database, sidebar, full transaction register,
+and home dashboard with spending chart and bill reminders.
 
-CATEGORY LIST VIEW:
-- Tree view showing all categories in their hierarchy
-- Each category shows: name, type (income/expense/transfer), number of transactions using it
-- Indent child categories under parents
-- Expand/collapse parent categories
+Now execute Phase 5 — Categories & Budgets.
 
-CATEGORY CRUD:
-- Add Category: name, type, optional parent category (select from existing parents)
-- Edit Category: rename, change parent, change type
-- Delete Category: only if no transactions reference it. Show warning with count if in use.
-  Offer to reassign transactions to another category before deletion.
+1. CATEGORY MANAGEMENT (route: /categories or accessible via a modal/settings)
+   - Tree view showing all categories in hierarchy (parents with children indented)
+   - Each row: category name, type badge (income/expense/transfer), transaction count using it
+   - Expand/collapse parent categories
+   - Add Category: name, type dropdown, optional parent category dropdown
+   - Edit Category: rename, change parent, change type
+   - Delete Category: only if no transactions reference it. If in use, show count and block deletion.
+   - API routes: GET/POST /api/categories, PUT/DELETE /api/categories/[id]
 
-API ROUTES:
-- GET /api/categories — All categories in tree structure
-- POST /api/categories — Create new category
-- PUT /api/categories/[id] — Update category
-- DELETE /api/categories/[id] — Delete category (fail if in use, unless reassignment target provided)
+2. BUDGET TRACKING PAGE (route: /budgets)
+   - Month navigation at top: ← arrow | "Month YYYY" | → arrow
+   - Summary bar: "Total Budgeted: $X,XXX | Total Spent: $X,XXX | Remaining: $X,XXX"
+   - Table with one row per budgeted expense category:
+     Category | Budgeted | Actual Spent | Remaining | Progress Bar
+   - Progress bar: green fill ≤75%, yellow 75-100%, red >100% of budget
+   - Budgeted column is editable — clicking shows an input to change the amount
+   - Actual Spent is computed from transactions in that category for the selected month
+   - Categories without a budget set can still show spending (with $0 budget)
+   - "Add Budget" row at bottom for categories not yet budgeted
 
-This doesn't need to be elaborate — a simple, functional management page is fine.
+3. BUDGET API
+   - GET /api/budgets?year=YYYY&month=MM: returns budgets with actual spending per category
+   - POST /api/budgets: upsert — create or update budget for category+year+month
+   - DELETE /api/budgets/[id]: remove a budget line
+
+4. DASHBOARD INTEGRATION
+   Update the Budget summary widget on the home dashboard (from Phase 4) to show real data:
+   - Compute: sum of all budget amounts for current month - sum of actual spending this month
+   - Display as "$X,XXX left" in green, or "-$XXX over budget" in red
+   - Link to /budgets for details
+
+Make sure all budget calculations use the same amount-in-cents convention as the rest of the app.
+The budget page should show meaningful data with the seeded budgets and transactions.
 ```
 
-### Prompt 5.2: Budget Tracking
+### Step 2: Testing Checklist
 
 ```
-Build the budget creation and tracking interface at /budgets.
+□ /categories (or category management UI) shows all categories in a tree
+□ Can add a new category (e.g., "Subscriptions" under "Bills & Utilities")
+□ Can rename an existing category
+□ Deleting a category with transactions shows an error/warning
+□ Deleting an unused category works
+□ /budgets page shows the current month with seeded budget data
+□ Budget table shows category, budgeted amount, actual spending, remaining
+□ Progress bars show correct fill level and color (green/yellow/red)
+□ Can change a budget amount by clicking the Budgeted column
+□ Month navigation (← →) changes the displayed month
+□ Navigating to a month with no budgets shows empty state or $0 values
+□ Dashboard budget widget now shows real "$ left" data
+□ Budget remaining matches: sum(budgets) - sum(expenses for the month)
+□ No console errors
+```
 
-BUDGET SETUP VIEW:
-- Table with one row per expense category
-- Columns: Category | Monthly Budget | Actual (this month) | Remaining
-- Monthly budget column is editable — click to type a dollar amount
-- Saving updates or creates the budget record for the current month/year
-- Auto-populate the Actual column by summing transactions in that category for the current month
+### Step 3: Commit
 
-BUDGET OVERVIEW:
-- Month selector at top: ← Previous Month | "January 2026" | Next Month →
-- Summary row at top: "Total Budgeted: $X,XXX | Total Spent: $X,XXX | Remaining: $X,XXX"
-- For each budgeted category:
-  - Category name
-  - Progress bar: green fill up to 75% of budget, yellow 75-100%, red over 100%
-  - "Budgeted: $XXX | Spent: $XXX | Left: $XXX" text
-
-API ROUTES:
-- GET /api/budgets?year=YYYY&month=MM — Get budgets for a month with actual spending
-- POST /api/budgets — Create/update budget (upsert by category+year+month)
-
-DASHBOARD INTEGRATION:
-Update the "Budget" section on the home dashboard to show real budget data:
-- "$X,XXX left" using actual budget vs. spending calculation
-- Link to /budgets page for details
+```bash
+git add -A
+git commit -m "Phase 5: Categories & Budgets — category CRUD, budget tracking, progress bars"
 ```
 
 ---
 
 ## Phase 6: Bills & Scheduling
 
-### Prompt 6.1: Bills Management Page
+> **Goal**: Full bill reminder management, "Mark as Paid" flow, and recurring date advancement.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Build the bills management page at /bills.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for full context.
 
-BILLS LIST VIEW:
-- Page title: "Bills & Income"
-- Three sections: Overdue, Due Soon (next 7 days), Upcoming
-- Each bill shows:
-  - Status indicator (red circle for overdue, orange for due soon, gray for upcoming)
-  - Bill name
-  - Amount (in red for bills, in green for income)
-  - Due date ("Due Feb 21" or "Overdue by 3 days")
-  - Frequency badge ("Monthly", "Quarterly", etc.)
-  - "Auto" badge if is_automatic
-  - Action buttons: "Mark as Paid", "Skip", "Edit"
+Phases 1–5 are complete: running app with database, sidebar, transaction register,
+home dashboard, category management, and budget tracking.
 
-MARK AS PAID FLOW:
-When user clicks "Mark as Paid" on a bill:
-1. Show a confirmation dialog with pre-filled details (amount, date=today, account, category)
-2. Allow the user to adjust the amount or date
-3. On confirm:
-   - Create a transaction on the bill's linked account with the bill amount, category, and date
-   - Advance the bill's next_due_date based on frequency:
-     - weekly: +7 days
-     - biweekly: +14 days
-     - monthly: +1 month (using date-fns addMonths)
-     - quarterly: +3 months
-     - annually: +1 year
-     - once: mark bill as completed (hide or delete)
-4. Refresh the bills list and sidebar
+Now execute Phase 6 — Bills & Scheduling.
 
-SKIP FLOW:
-- Advance the next_due_date without creating a transaction
+1. BILLS PAGE (route: /bills)
+   - Page title: "Bills & Income"
+   - Three sections: OVERDUE (red header), DUE SOON (orange, next 7 days), UPCOMING (gray)
+   - Each bill row shows:
+     Status indicator (red/orange/gray circle), bill name, amount (-$XXX in red, or +$XXX
+     in green for income), due date ("Due Feb 21" or "Overdue by 3 days"),
+     frequency badge ("Monthly"), "Auto" badge if is_automatic
+   - Action buttons per bill: "Mark as Paid" (green), "Skip" (gray), "Edit" (pencil icon)
 
-ADD/EDIT BILL MODAL:
-- Fields: name, amount, category (dropdown), account (dropdown), frequency (dropdown), 
-  next due date (date picker), is income (checkbox), is automatic (checkbox)
-- For new bills, default frequency to "monthly" and next due date to the 1st of next month
+2. MARK AS PAID
+   When clicking "Mark as Paid":
+   - Show confirmation dialog pre-filled with: amount, date (today), account, category
+   - User can adjust the amount or date before confirming
+   - On confirm:
+     a) Create a transaction on the bill's linked account with bill's amount (as negative
+        cents for expense, positive for income), bill's category, and the selected date
+     b) Advance next_due_date based on frequency:
+        weekly→+7d, biweekly→+14d, monthly→+1mo (date-fns addMonths),
+        quarterly→+3mo, annually→+1yr, once→mark as completed
+     c) Refresh the bills list, sidebar balances, and dashboard
+   - API: POST /api/bills/[id]/pay { amount?, date? }
 
-API ROUTES:
-- GET /api/bills — All bill reminders with computed status
-- POST /api/bills — Create new bill reminder
-- PUT /api/bills/[id] — Update bill reminder
-- DELETE /api/bills/[id] — Delete bill reminder
-- POST /api/bills/[id]/pay — Mark as paid (creates transaction, advances date)
-- POST /api/bills/[id]/skip — Skip (advances date without transaction)
+3. SKIP
+   - Advance next_due_date without creating a transaction
+   - API: POST /api/bills/[id]/skip
+
+4. BILL CRUD
+   - "Add Bill" button opens a modal with fields: name, amount (dollar input),
+     category (dropdown), account (dropdown), frequency (dropdown), next due date (date picker),
+     is income (checkbox), is automatic (checkbox)
+   - Edit opens same modal pre-filled
+   - Delete with confirmation
+   - API: POST/PUT/DELETE /api/bills, /api/bills/[id]
+
+5. DASHBOARD INTEGRATION
+   Make sure the Bill Reminders widget on the home dashboard (Phase 4) uses the same query
+   as this page. Clicking a bill on the dashboard could navigate to /bills.
+
+Test with the 6 seeded bill reminders. Mark one as paid and verify a transaction was created
+and the due date advanced.
+```
+
+### Step 2: Testing Checklist
+
+```
+□ /bills page shows all 6 seeded bill reminders
+□ Bills are sorted into correct sections (overdue/due soon/upcoming)
+□ Each bill shows name, amount, due date, frequency badge
+□ "Mark as Paid" opens a confirmation dialog with pre-filled details
+□ Confirming "Mark as Paid":
+  - Creates a new transaction (visible in the account's register)
+  - Advances the bill's next_due_date by one frequency period
+  - Updates the sidebar balance for the affected account
+  - The bill moves to its new due date section
+□ "Skip" advances the due date without creating a transaction
+□ "Add Bill" opens modal, creating a new bill works
+□ "Edit" opens pre-filled modal, saving changes works
+□ Delete removes the bill with confirmation
+□ Dashboard bill reminders widget still works correctly
+□ No console errors
+```
+
+### Step 3: Commit
+
+```bash
+git add -A
+git commit -m "Phase 6: Bills & Scheduling — bill CRUD, mark as paid, recurring dates"
 ```
 
 ---
 
 ## Phase 7: Reports & Analytics
 
-### Prompt 7.1: Reports Page
+> **Goal**: Data visualization and financial analysis reports.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Build the reports page at /reports with multiple report types.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for full context.
 
-REPORTS HUB:
-- Page title: "Reports"
-- Report type selector (tabs or cards): 
-  Spending Over Time | Net Worth | Income vs Expenses | Category Breakdown
+Phases 1–6 are complete. The app has all core features: accounts, transactions, dashboard,
+categories, budgets, and bills.
 
-REPORT 1: SPENDING OVER TIME
-- Bar chart showing monthly total spending for the last 12 months
-- X-axis: months (Jan, Feb, Mar...)
-- Y-axis: dollar amounts
-- Hovering a bar shows the exact amount
-- Date range selector: Last 6 Months, Last 12 Months, This Year, Last Year, All Time
-- Account filter: All Accounts or specific account group
+Now execute Phase 7 — Reports & Analytics.
 
-REPORT 2: NET WORTH OVER TIME
-- Line chart tracking net worth at end of each month
-- Computed by: for each month-end date, calculate the sum of all account balances
-  (initial_balance + sum of transactions through that date)
-- X-axis: months
-- Y-axis: dollar amounts
-- Show the current net worth prominently
-- Date range: Last 12 Months, Last 2 Years, All Time
+Build a reports hub at /reports with four report types, selectable via tabs or cards at the top:
 
-REPORT 3: INCOME VS EXPENSES
-- Grouped bar chart: two bars per month (income in green, expenses in red)
-- Shows the surplus/deficit below each month
-- Date range selector
+1. SPENDING OVER TIME
+   - Recharts BarChart showing monthly total spending (sum of expense transactions) for each month
+   - X-axis: month labels (Jan, Feb, Mar...), Y-axis: dollar amounts
+   - Tooltip on bar hover showing exact amount
+   - Date range selector: Last 6 Months, Last 12 Months, This Year, Last Year, All Time
 
-REPORT 4: CATEGORY BREAKDOWN
-- Detailed table showing spending per category for a selected period
-- Columns: Category | Amount | % of Total | Avg per Month
-- Sorted by amount descending
-- Expandable rows to see subcategories
-- Bar visualization next to each row showing relative size
+2. NET WORTH OVER TIME
+   - Recharts LineChart tracking net worth at the end of each month
+   - For each month-end, compute: sum of all account initial balances + sum of all transactions
+     through that month-end date
+   - Show current net worth prominently above the chart
+   - Date range: Last 12 Months, Last 2 Years, All Time
 
-All charts use Recharts components:
-- BarChart + Bar for bar charts
-- LineChart + Line for line charts
-- PieChart + Pie for category breakdown (reuse from dashboard)
-- ResponsiveContainer wrapper for all charts
+3. INCOME VS EXPENSES
+   - Recharts grouped BarChart: two bars per month (green=income, red=expenses)
+   - Below each pair: surplus/deficit label
+   - Date range selector
+   - Summary: total income, total expenses, net surplus/deficit for the period
 
-Use Recharts tooltips, legends, and axis formatting for professional presentation.
-Format all dollar amounts with commas and $ sign in chart labels.
+4. CATEGORY BREAKDOWN
+   - Detailed table: Category | Amount | % of Total | Avg per Month
+   - Sorted by amount descending
+   - Expandable rows to show subcategories
+   - Small horizontal bar next to each row showing relative size vs largest category
+   - Reuse the donut chart from the dashboard above the table
+   - Date range selector
 
-QUERY FUNCTIONS (src/lib/db/queries/reports.ts):
-1. getMonthlySpending(startDate, endDate) — Monthly totals of expense transactions
-2. getNetWorthOverTime(startDate, endDate) — Net worth snapshot at each month end
-3. getMonthlyIncomeVsExpenses(startDate, endDate) — Monthly income and expense totals
-4. getCategoryBreakdown(startDate, endDate) — Per-category spending with hierarchy
+REPORT QUERIES (src/lib/db/queries/reports.ts):
+- getMonthlySpending(start, end): monthly expense totals as array of {month, year, total}
+- getNetWorthOverTime(start, end): net worth at each month-end
+- getMonthlyIncomeVsExpenses(start, end): monthly income and expense totals
+- getCategoryBreakdown(start, end): per-category spending with hierarchy
+
+ALL reports should have:
+- Date range controls (dropdown with presets)
+- Recharts with ResponsiveContainer, proper axis formatting (dollar amounts with $),
+  tooltips, and legends
+- Clean layout with the chart above and any summary stats below
+
+Use the seeded data to verify charts render with meaningful data.
+```
+
+### Step 2: Testing Checklist
+
+```
+□ /reports page loads with report type tabs/cards
+□ SPENDING OVER TIME: bar chart renders with monthly bars
+□ SPENDING OVER TIME: hovering a bar shows the dollar amount
+□ SPENDING OVER TIME: changing date range updates the chart
+□ NET WORTH: line chart renders with monthly data points
+□ NET WORTH: current net worth displayed above chart matches sidebar
+□ INCOME VS EXPENSES: grouped bars show income (green) and expenses (red)
+□ INCOME VS EXPENSES: surplus/deficit summary is accurate
+□ CATEGORY BREAKDOWN: table shows categories sorted by spending
+□ CATEGORY BREAKDOWN: percentages add up to ~100%
+□ CATEGORY BREAKDOWN: expandable rows show subcategories
+□ All charts use proper dollar formatting on axes ($1,000, $2,000, etc.)
+□ Date range selectors work across all report types
+□ Charts are responsive (resize with browser window)
+□ No console errors
+```
+
+### Step 3: Commit
+
+```bash
+git add -A
+git commit -m "Phase 7: Reports — spending, net worth, income vs expenses, category breakdown"
 ```
 
 ---
 
 ## Phase 8: Polish & Power Features
 
-### Prompt 8.1: CSV Import/Export
+> **Goal**: CSV import/export, search, keyboard shortcuts, and final quality pass.
+
+### Step 1: Paste this CONTEXT + BUILD prompt
 
 ```
-Add CSV import and export capabilities.
+This is the Closed Ledger project — a Quicken-inspired personal finance app.
+Read IMPLEMENTATION.md for full context.
 
-CSV EXPORT:
-- Add "Export" button to the transaction register page
-- Exports all visible transactions (respecting current filters) to a CSV file
-- Columns: Date, Payee, Memo, Category, Tag, Amount, Check Number, Account
-- Amount should be in dollar format (positive for deposits, negative for payments)
-- Trigger a browser download of the CSV file
-- Also add export to the reports page for report data
+Phases 1–7 are complete. All core features are built. Now execute Phase 8 — Polish.
 
-CSV IMPORT:
-- Add "Import" button to the transaction register page (or a dedicated /import route)
-- Upload UI: drag-and-drop zone + file browser button for CSV files
-- Column mapping step:
-  1. Parse the CSV and show a preview of the first 5 rows
-  2. Show dropdowns for each CSV column to map to: Date, Payee, Memo, Category, Amount, Check Number, (Skip)
-  3. Auto-detect common column names (Date, Description, Amount, etc.)
-- Import preview: show how the transactions will look before committing
-- Import execution: create all transactions on the selected account
-- Handle common CSV formats from major banks (Chase, Bank of America, etc.)
-  - Some banks put amount in one column (negative for debits)
-  - Some banks have separate Debit and Credit columns
-- Error handling: show which rows failed to import and why
+1. CSV EXPORT
+   - "Export" button on the transaction register page
+   - Exports visible transactions (respecting filters) as CSV download
+   - Columns: Date, Payee, Memo, Category, Tag, Amount (dollars, negative for payments), Check #, Account
+   - Also add export capability to reports pages
+   - API: GET /api/transactions/export?accountId=X&dateStart=Y&dateEnd=Z → returns CSV
 
-API ROUTES:
-- POST /api/transactions/import — Accept CSV data + column mapping, create transactions
-- GET /api/transactions/export?accountId=X&dateStart=Y&dateEnd=Z — Return CSV data
+2. CSV IMPORT
+   - "Import" button on the register or a /import route
+   - Upload: drag-and-drop zone + file picker for .csv files
+   - Step 1: Parse CSV, show preview of first 5 rows
+   - Step 2: Column mapping — dropdowns for each CSV column to map to: Date, Payee, Memo,
+     Category, Amount, Check Number, (Skip). Auto-detect common names.
+   - Step 3: Preview how transactions will look
+   - Step 4: Execute import on selected account
+   - Handle both single-amount and separate debit/credit column formats
+   - Error handling: show which rows failed and why
+   - API: POST /api/transactions/import
+
+3. GLOBAL SEARCH
+   - Search icon in the top nav bar
+   - Opens a Cmd+K style search overlay/modal
+   - Search across all transactions: payee, memo, amount, category name
+   - Results grouped by account
+   - Clicking a result navigates to that transaction in its register
+   - Debounced 300ms search as user types
+   - API: GET /api/search?q=query&limit=20
+
+4. KEYBOARD SHORTCUTS
+   - Ctrl/Cmd+K: open search
+   - Ctrl/Cmd+N: focus new transaction row
+   - Escape: cancel edit / close modal
+   - Enter: save current edit
+   - "?" key: show shortcuts help modal
+
+5. LOADING & EMPTY STATES
+   - Add loading.tsx skeleton/shimmer states for each route
+   - Empty state messages for: no transactions, no bills, no budgets, no report data
+
+6. ERROR HANDLING
+   - API routes return proper error JSON with messages
+   - Forms show inline validation errors (required fields, invalid amounts)
+   - Toast/notification component for success messages ("Transaction created", "Bill paid")
+
+7. DATA BACKUP
+   - "Backup" button in sidebar settings area
+   - Copies closed-ledger.db to data/backups/closed-ledger-YYYY-MM-DD-HHMMSS.db
+   - "Restore" lists available backups and can replace the current database
+   - Confirmation dialog before restore (destructive action)
+
+8. PERFORMANCE
+   - Add database indexes: transactions(account_id, date), transactions(category_id),
+     transactions(payee), categories(parent_id)
+   - Verify sidebar and register load fast with 500+ transactions
+
+9. PRINT STYLES
+   - @media print rules that hide sidebar and nav
+   - Reports are print-friendly
 ```
 
-### Prompt 8.2: Search & Keyboard Shortcuts
+### Step 2: Testing Checklist
 
 ```
-Add global search and keyboard shortcuts.
-
-GLOBAL SEARCH:
-- Search icon in the top navigation bar
-- Clicking opens a search modal/overlay (similar to Cmd+K patterns)
-- Search across all transactions: payee, memo, amount, category
-- Show results grouped by account
-- Click a result to navigate to that transaction in its register
-- Debounced search (300ms) as user types
-- API: GET /api/search?q=<query>&limit=20
-
-KEYBOARD SHORTCUTS:
-Implement these shortcuts (show a help modal listing them via ? key):
-- Ctrl/Cmd + K: Open search
-- Ctrl/Cmd + N: New transaction (focus the new transaction row)
-- Escape: Cancel current edit / close modal
-- Enter: Save current transaction edit
-- Up/Down arrows: Navigate between transaction rows
-- Ctrl/Cmd + S: Save all pending changes
-
-Use a lightweight keyboard shortcut library or implement with useEffect + event listeners.
-Add a small "?" icon in the bottom right that shows the shortcuts reference.
+□ CSV EXPORT: "Export" button on register downloads a valid CSV file
+□ CSV EXPORT: Opening the CSV in a spreadsheet shows correct data
+□ CSV IMPORT: Can upload a CSV file and see a preview
+□ CSV IMPORT: Column mapping dropdowns work
+□ CSV IMPORT: Importing creates real transactions visible in the register
+□ SEARCH: Ctrl/Cmd+K opens search overlay
+□ SEARCH: Typing a payee name shows matching transactions
+□ SEARCH: Clicking a result navigates to the correct register
+□ SHORTCUTS: "?" shows keyboard shortcuts help
+□ LOADING: Pages show skeleton/shimmer while loading
+□ EMPTY STATES: New account shows "No transactions yet" message
+□ ERRORS: Submitting a transaction with no amount shows validation error
+□ TOAST: Creating a transaction shows a success notification
+□ BACKUP: Clicking backup creates a file in data/backups/
+□ BACKUP: Restore replaces the database (test with caution)
+□ PERFORMANCE: Register loads in under 1 second with all seed data
+□ PRINT: Ctrl+P on a report page shows a clean printable view
+□ No console errors across the entire application
 ```
 
-### Prompt 8.3: Final Polish
-
-```
-Final polish pass on the entire application.
-
-1. LOADING STATES:
-   - Add loading.tsx files for each route that show a skeleton/shimmer state
-   - Sidebar should show shimmer placeholders while accounts load
-   - Transaction table should show row placeholders while loading
-
-2. EMPTY STATES:
-   - New account with no transactions: "No transactions yet. Add your first transaction below."
-   - No bills set up: "No bill reminders. Add your first bill to get started."
-   - No budgets: "Set up your monthly budget to track spending."
-   - Reports with no data in range: "No data for the selected period."
-
-3. ERROR HANDLING:
-   - API routes should return proper error responses with messages
-   - Forms should show inline validation errors
-   - Toast/notification for successful operations (transaction created, bill paid, etc.)
-
-4. RESPONSIVE SIDEBAR:
-   - On smaller screens (<1024px), sidebar collapses to icons only or hides behind a hamburger menu
-   - Content area takes full width when sidebar is collapsed
-
-5. DATA BACKUP:
-   - Add a "Backup" button in settings/header
-   - Creates a timestamped copy of openledger.db in a data/backups/ directory
-   - "Restore" option that lists available backups and replaces the current database
-
-6. PRINT STYLES:
-   - Add @media print CSS rules
-   - Hide sidebar and navigation when printing
-   - Reports pages should be print-friendly
-
-7. PERFORMANCE:
-   - Add database indexes for common queries:
-     - transactions(account_id, date)
-     - transactions(category_id)
-     - transactions(payee)
-     - categories(parent_id)
-   - Ensure the sidebar balance query is efficient even with thousands of transactions
-
-Review the entire application for consistency in:
-- Color usage (negative values always red, consistent chart colors)
-- Currency formatting (consistent decimal places, comma separators)
-- Date formatting (consistent M/D/YYYY throughout)
-- Spacing and alignment (consistent padding, aligned numbers)
-```
-
----
-
-## Appendix: Useful Reference Commands
+### Step 3: Final Commit
 
 ```bash
-# Generate a new migration after schema changes
-npm run db:generate
-
-# Apply migrations
-npm run db:migrate
-
-# Re-seed the database (warning: clears existing data)
-npm run db:seed
-
-# Start development server
-npm run dev
-
-# Check TypeScript types
-npx tsc --noEmit
-
-# Inspect the SQLite database directly
-sqlite3 data/openledger.db ".tables"
-sqlite3 data/openledger.db "SELECT name, group_name FROM accounts ORDER BY group_name, sort_order;"
-sqlite3 data/openledger.db "SELECT COUNT(*) FROM transactions;"
-
-# Build for production
-npm run build && npm start
+git add -A
+git commit -m "Phase 8: Polish — CSV import/export, search, shortcuts, backup, loading states"
 ```
 
 ---
 
-## Appendix: Verification Checklist
+## Post-Completion: Full App Verification
 
-After completing all phases, verify:
+After all 8 phases, run through this end-to-end test:
 
-- [ ] App starts cleanly with `npm run dev`
-- [ ] Fresh database is created and migrated automatically on first run
-- [ ] Seed data populates correctly and can be re-run safely
-- [ ] Sidebar shows all accounts with correct balances
-- [ ] Net Worth calculation matches: sum of all account balances
-- [ ] Transaction register shows correct running balances
-- [ ] Creating a transaction updates the account balance in the sidebar
-- [ ] Transfers create paired transactions on both accounts
-- [ ] Dashboard spending chart shows real aggregated data
-- [ ] Bill reminders show correct due dates and statuses
-- [ ] "Mark as Paid" creates a transaction and advances the due date
-- [ ] Budgets show accurate budget vs. actual spending
-- [ ] Reports generate correct visualizations
-- [ ] CSV import creates valid transactions
-- [ ] CSV export downloads a correct file
-- [ ] Search finds transactions across accounts
-- [ ] No console errors in browser or terminal
-- [ ] Database file persists across dev server restarts
+```
+□ Fresh start: delete data/closed-ledger.db, run npm run dev — app creates DB automatically
+□ Run npm run db:seed — all seed data populates
+□ Sidebar shows 13 accounts with correct balances across 4 groups
+□ Net Worth is calculated correctly
+□ Click Family Checking → register shows 100+ transactions with correct running balance
+□ Create a new transaction → sidebar balance updates, register shows new row
+□ Delete a transaction → balance updates correctly
+□ Home dashboard shows spending chart with real data
+□ Bill reminders show upcoming bills with correct dates
+□ Mark a bill as paid → transaction created, due date advances, balances update
+□ Budget page shows budget vs actual for current month
+□ Reports page generates all 4 report types with real data
+□ Import a CSV from a bank → transactions appear in register
+□ Export transactions → valid CSV downloads
+□ Search finds transactions by payee name
+□ Backup creates a copy of the database file
+□ App handles 500+ transactions without performance issues
+```
+
+---
+
+## Troubleshooting Common Issues
+
+**"Cannot find module 'better-sqlite3'"**
+→ Run `npm install` again. May need build tools: `apt-get install build-essential python3`
+
+**"SQLITE_CONSTRAINT: FOREIGN KEY constraint failed"**
+→ Seed script is inserting in wrong order. Categories must come before transactions.
+
+**"Hydration mismatch" errors**
+→ A server component is using browser-only APIs. Make sure client components have "use client" directive.
+
+**Sidebar shows $0 for all balances**
+→ The balance query likely has a JOIN issue. Check that getAccountsWithBalances uses LEFT JOIN.
+
+**Running balance is wrong in the register**
+→ Check sort order: must be date ASC, id ASC. Check that initial balance is included as the starting point.
+
+**Charts don't render**
+→ Recharts requires "use client". Make sure chart components are client components.
+
+**Database resets on restart**
+→ Check that data/ is NOT in any clean/build script. The database file must persist.
