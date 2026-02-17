@@ -121,28 +121,71 @@ All data stays within the repository's `data/` directory (gitignored). Each mach
 
 ## Getting Started
 
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+### Prerequisites
 
-# Install dependencies
+- **Python 3.11+** — [python.org/downloads](https://www.python.org/downloads/)
+- **Git** — [git-scm.com](https://git-scm.com/)
+
+### Clone and Run
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/dalinkstone/closed-ledger.git
+cd closed-ledger
+
+# 2. Create a virtual environment
+python3 -m venv venv
+
+# 3. Activate the virtual environment
+source venv/bin/activate        # macOS / Linux
+# venv\Scripts\activate         # Windows (Command Prompt)
+# venv\Scripts\Activate.ps1     # Windows (PowerShell)
+
+# 4. Install dependencies
 pip install -r requirements.txt
 
-# Run the application
+# 5. Run the application
 python -m closed_ledger
+```
 
-# (Optional) Seed with demo data — will prompt for passphrase first
+### First Launch
+
+On first launch you will be prompted to create a master passphrase (minimum 8 characters). This passphrase encrypts your financial database. **If you lose it, your data cannot be recovered.** There is no reset mechanism.
+
+After setting your passphrase, the main window will appear. All data is stored in the `data/` directory inside the project root. This directory is gitignored — each machine that clones the repo creates its own independent passphrase and encrypted database.
+
+### Seed with Demo Data
+
+To populate the application with sample accounts and transactions for testing:
+
+```bash
 python -m closed_ledger --seed
 ```
 
-### requirements.txt
+This creates 13 accounts, 50+ categories, 250+ transactions, bill reminders, and budgets matching Quicken-style screenshots. The seed only runs once — it will not duplicate data on subsequent runs.
+
+### Subsequent Launches
+
+```bash
+cd closed-ledger
+source venv/bin/activate        # macOS / Linux
+python -m closed_ledger
+```
+
+You will be prompted to enter your passphrase to unlock the encrypted database. Entering a wrong passphrase will show "Incorrect passphrase" in red — you can retry or quit.
+
+### Running on Another Machine
+
+Clone the repo on the new machine and follow the same steps above. Each machine maintains its own passphrase and encrypted database independently. The `data/` directory is never committed to git.
+
+### Dependencies
+
+Only two external packages are required:
+
 ```
 PySide6>=6.6
 cryptography>=42.0
 ```
-
-That's the entire dependency list.
 
 ## Project Structure
 

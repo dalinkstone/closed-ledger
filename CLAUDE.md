@@ -12,16 +12,21 @@ Closed Ledger is a local-first, single-user personal finance desktop app modeled
 - **INSTRUCTIONS.md** — Phased build workflow with copy-paste prompts and testing checklists
 - **README.md** — Project overview, architecture rationale, data model diagram, project structure
 
-## Build & Dev Commands
+## Setup & Run
 
 ```bash
-python3 -m venv venv && source venv/bin/activate   # Create/activate virtualenv
-pip install -r requirements.txt                      # Install deps (PySide6, cryptography)
-python -m closed_ledger                              # Run the application
-python -m closed_ledger --seed                       # Run with demo data seeding
+git clone https://github.com/dalinkstone/closed-ledger.git
+cd closed-ledger
+python3 -m venv venv
+source venv/bin/activate            # macOS/Linux (venv\Scripts\activate on Windows)
+pip install -r requirements.txt
+python -m closed_ledger             # First run: prompts to create passphrase
+python -m closed_ledger --seed      # Optional: populate demo data
 ```
 
-No test framework is configured. Verify correctness with the testing checklists in INSTRUCTIONS.md. Type checking can be done with `mypy` if added.
+All data is stored in the gitignored `data/` directory. Each machine creates its own passphrase and encrypted database on first run — nothing is shared between machines via git.
+
+No test framework is configured. Verify correctness with the testing checklists in INSTRUCTIONS.md.
 
 ## Tech Stack
 
