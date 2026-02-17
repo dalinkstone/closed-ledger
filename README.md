@@ -1,24 +1,29 @@
 # Closed Ledger — A Quicken-Inspired Personal Finance Manager
 
-> A full-featured, single-user personal finance desktop application modeled after Quicken Classic (circa 2013–2017). Built as a local-first web application with persistent SQLite storage.
+> A native desktop personal finance application modeled after Quicken Classic (2013–2017). Fully offline. No servers, no ports, no network. Python + Qt + SQLite.
 
 ---
 
 ## Overview
 
-Closed Ledger is a faithful recreation of Intuit's Quicken personal finance software — specifically the Quicken Premier 2013–2017 era desktop experience. It provides comprehensive personal finance management including account tracking, transaction registers, budgeting, bill reminders, spending analysis, and net worth calculation — all running locally on your machine with zero cloud dependency.
+Closed Ledger is a faithful recreation of Intuit's Quicken personal finance software — specifically the Quicken Premier 2013–2017 era desktop experience. It provides comprehensive personal finance management including account tracking, transaction registers, budgeting, bill reminders, spending analysis, and net worth calculation.
 
-This project exists as a learning exercise and personal tool. It is not affiliated with Quicken Inc. or Intuit.
+This is a **true desktop application**. It runs as a native window on your machine. There is no web server, no localhost binding, no HTTP, no browser. Your financial data never leaves your filesystem.
 
-## Screenshots Reference
+This project exists as a personal tool and learning exercise. It is not affiliated with Quicken Inc. or Intuit.
 
-The UI is modeled after three core views captured from Quicken:
+## Security Model
 
-1. **Transaction Register** — The primary data entry view. A spreadsheet-like table showing Date, Check #, Payee, Memo, Category, Tag, Payment, Deposit, and running Balance. Includes filter bar (date range, transaction type) and a status bar showing transaction count and current/ending balance.
+Closed Ledger treats your financial data as sensitive by default.
 
-2. **Home Dashboard (Mac variant)** — The overview landing page featuring a "Spending By Category" donut chart with dollar total, a "Bill & Income Reminders" section showing upcoming bills with due dates and amounts, and a Budget summary. Left sidebar shows all accounts grouped by type with balances.
-
-3. **Home Dashboard (Windows 2017)** — Similar overview with "See Where Your Money Goes" spending donut chart showing last 30 days of spending, "Stay On Top of Monthly Bills" reminder section, and a "What's Left" remaining budget indicator. Includes net worth and credit score in the sidebar.
+- **Zero network exposure.** The application makes no network calls, opens no ports, binds no sockets. There is no server process. Outbound network access is never initiated.
+- **Master passphrase.** The application requires a passphrase on first launch. This passphrase is used to derive an encryption key (PBKDF2-HMAC-SHA256, 600,000 iterations) that encrypts your database file at rest using AES-256 via the `cryptography` library's Fernet implementation.
+- **Encrypted at rest.** The SQLite database is stored encrypted on disk. It is decrypted into memory only while the application is running. On close, the database is re-encrypted and the plaintext is securely overwritten.
+- **Restrictive file permissions.** Database and backup files are created with `0o600` permissions (owner read/write only).
+- **Auto-lock.** After a configurable inactivity timeout (default: 15 minutes), the application locks and requires the passphrase to resume.
+- **Parameterized queries only.** All SQL operations use parameterized queries. No string interpolation or formatting is ever used in SQL statements.
+- **Encrypted backups.** Backup files are encrypted with the same master key. Unencrypted data is never written to disk.
+- **No telemetry, no analytics, no logging of financial data.** Application logs (if enabled) never contain account balances, transaction amounts, payee names, or any financial content.
 
 ## Architecture
 
@@ -26,46 +31,38 @@ The UI is modeled after three core views captured from Quicken:
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| **Runtime** | Node.js 20+ | Universal JS runtime |
-| **Framework** | Next.js 14 (App Router) | Full-stack React framework with API routes |
-| **Language** | TypeScript (strict) | Type safety across the entire codebase |
-| **Database** | SQLite via `better-sqlite3` | Single-file persistent storage, zero config, survives rebuilds |
-| **ORM** | Drizzle ORM | Type-safe schema definitions, migrations, and queries |
-| **Styling** | Tailwind CSS 3 | Utility-first CSS matching Quicken's dense UI |
-| **Charts** | Recharts | React-native charting (donut charts, bar charts, line charts) |
-| **Date Handling** | date-fns | Lightweight date manipulation |
-| **Icons** | Lucide React | Clean, consistent icon set |
-| **State** | React Context + Server Components | Minimal client state, server-driven data |
+| **Language** | Python 3.11+ | Batteries-included stdlib, sqlite3 built-in |
+| **GUI Framework** | PySide6 (Qt 6) | Native desktop widgets, QTableView for registers, QTreeView for accounts, QtCharts for graphs |
+| **Database** | SQLite via Python `sqlite3` | Single-file, zero-config, built into Python — no native compilation needed |
+| **Encryption** | `cryptography` (Fernet / AES-256) | Database encryption at rest |
+| **Key Derivation** | PBKDF2-HMAC-SHA256 | Passphrase → encryption key |
+| **Charts** | PySide6.QtCharts | Native Qt donut, bar, and line charts |
+| **Date Handling** | Python `datetime` + `calendar` | No external dependencies needed |
+| **Packaging** | PyInstaller | Single-file `.app` / `.exe` distribution |
 
 ### Why This Stack?
 
-- **SQLite** is the cornerstone choice. The database file (`closed-ledger.db`) lives in a `data/` directory at the project root. It persists across `npm run dev` restarts, rebuilds, and even full `node_modules` wipes. This mirrors how Quicken stored everything in a single `.qdf` file.
-- **Next.js App Router** gives us server components for heavy data queries (transaction lists, reports) and API routes for mutations — all in one process.
-- **Drizzle ORM** provides type-safe schema definitions that double as documentation and enable auto-migrations.
-- **No external services** — everything runs on `localhost:3000`. No accounts, no API keys, no cloud.
+- **Qt is what Quicken was built on.** Dense table views, collapsible tree sidebars, tabbed navigation — these are native Qt widgets. QTableView maps directly to the transaction register. QTreeView maps to the account sidebar.
+- **Zero network surface.** No `npm`, no `node`, no localhost server, no HTTP stack. The application is a single process that opens a window.
+- **Python `sqlite3` is built-in.** No native module compilation (`node-gyp`, `better-sqlite3`). No package manager surprises. It just works.
+- **Minimal dependency chain.** The entire application depends on: `PySide6`, `cryptography`. That's it. Both are well-maintained, audited libraries.
 
 ### Data Persistence Strategy
 
 ```
-project-root/
-├── data/
-│   └── closed-ledger.db   ← SQLite database (GITIGNORED but never deleted)
-├── drizzle/
-│   └── migrations/         ← Schema migration files (COMMITTED)
-└── src/
-    └── lib/
-        └── db/
-            ├── schema.ts   ← Drizzle schema definitions
-            ├── index.ts    ← Database connection singleton
-            └── seed.ts     ← Optional demo data seeder
+~/.closed-ledger/                   ← XDG-compliant app data directory
+├── closed-ledger.db.enc            ← Encrypted SQLite database
+├── salt                            ← PBKDF2 salt (32 bytes, not secret)
+├── key_check                       ← Encrypted canary value for passphrase verification
+├── config.json                     ← Non-sensitive preferences (window size, theme, timeout)
+└── backups/
+    └── closed-ledger-2026-02-16-143022.db.enc  ← Encrypted backups
 ```
 
-The `data/` directory is `.gitignore`d but created automatically on first run. The database file survives:
-- `npm run build` / `npm run dev` restarts
-- `rm -rf node_modules && npm install`
-- Git operations (it's gitignored, not deleted)
-
-A seed script is provided to populate the database with realistic demo data matching the Quicken screenshots.
+The app data directory uses the platform-appropriate location:
+- **macOS**: `~/Library/Application Support/closed-ledger/`
+- **Linux**: `~/.local/share/closed-ledger/`
+- **Windows**: `%APPDATA%/closed-ledger/`
 
 ### Data Model (Core Entities)
 
@@ -77,21 +74,19 @@ A seed script is provided to populate the database with realistic demo data matc
 │ name         │     │ date             │     │ name         │
 │ type         │     │ payee            │     │ parent_id    │
 │ group        │     │ memo             │     │ type         │
-│ balance      │     │ category_id      │     └──────────────┘
+│ initial_bal  │     │ category_id      │     └──────────────┘
 │ is_debt      │     │ amount           │
 │ institution  │     │ check_number     │     ┌──────────────┐
 │ sort_order   │     │ tag              │     │   Budget     │
 └─────────────┘     │ is_reconciled    │     │              │
                      │ account_id       │     │ category_id  │
                      │ transfer_acct_id │     │ amount       │
-                     └──────────────────┘     │ period       │
-                                               │ month/year   │
-┌─────────────────┐                            └──────────────┘
+                     └──────────────────┘     │ month / year │
+                                               └──────────────┘
+┌─────────────────┐
 │  BillReminder   │
-│                 │
 │ id              │
-│ name            │
-│ amount          │
+│ name / amount   │
 │ category_id     │
 │ account_id      │
 │ frequency       │
@@ -104,12 +99,13 @@ A seed script is provided to populate the database with realistic demo data matc
 ## Feature Map
 
 ### Core Features (Phase 1–4)
+- Master passphrase with encrypted database at rest
 - Account sidebar with grouped accounts (Banking, Investing, Property & Debt, Savings Goals)
 - Running account balances and Net Worth calculation
-- Full transaction register with inline editing
+- Full transaction register with inline editing (QTableView)
 - Transaction filtering (date range, type, category, payee search)
 - Hierarchical categories (e.g., "Food & Dining:Restaurants")
-- Home dashboard with spending donut chart
+- Home dashboard with spending donut chart (QtCharts)
 - Bill & Income reminders with due date tracking
 
 ### Extended Features (Phase 5–7)
@@ -117,106 +113,118 @@ A seed script is provided to populate the database with realistic demo data matc
 - Spending tab with detailed category breakdowns
 - Recurring/scheduled transactions
 - Reports: Spending Over Time, Net Worth Over Time, Category Comparison
-- Data import (CSV) and export
+- Data import (CSV) and export (encrypted or plaintext with warning)
 - Transaction search across all accounts
 
-### Nice-to-Have (Phase 8)
-- Keyboard shortcuts for power users
-- Dark mode
-- Printable reports
-- Data backup/restore
+### Polish (Phase 8)
+- Keyboard shortcuts
+- Auto-lock on inactivity
+- Encrypted backups with restore
+- PyInstaller packaging
 
 ## Getting Started
 
 ```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+
 # Install dependencies
-npm install
+pip install -r requirements.txt
 
-# Run database migrations
-npm run db:migrate
+# Run the application
+python -m closed_ledger
 
-# (Optional) Seed with demo data matching Quicken screenshots
-npm run db:seed
-
-# Start development server
-npm run dev
-
-# Open in browser
-open http://localhost:3000
+# (Optional) Seed with demo data — will prompt for passphrase first
+python -m closed_ledger --seed
 ```
+
+### requirements.txt
+```
+PySide6>=6.6
+cryptography>=42.0
+```
+
+That's the entire dependency list.
 
 ## Project Structure
 
 ```
-src/
-├── app/                          # Next.js App Router
-│   ├── layout.tsx                # Root layout with sidebar
-│   ├── page.tsx                  # Home dashboard
-│   ├── accounts/
-│   │   └── [id]/
-│   │       └── page.tsx          # Transaction register for account
-│   ├── spending/
-│   │   └── page.tsx              # Spending analysis
-│   ├── bills/
-│   │   └── page.tsx              # Bill reminders management
-│   ├── budgets/
-│   │   └── page.tsx              # Budget tracking
-│   ├── reports/
-│   │   └── page.tsx              # Reports hub
-│   └── api/                      # API routes for mutations
-│       ├── accounts/
-│       ├── transactions/
-│       ├── categories/
-│       ├── bills/
-│       └── budgets/
-├── components/
-│   ├── layout/
-│   │   ├── Sidebar.tsx           # Account sidebar (always visible)
-│   │   ├── TopNav.tsx            # Tab navigation bar
-│   │   └── StatusBar.tsx         # Bottom status bar
-│   ├── accounts/
-│   │   ├── AccountGroup.tsx      # Collapsible account group
-│   │   └── AccountForm.tsx       # Add/edit account modal
-│   ├── transactions/
-│   │   ├── TransactionTable.tsx  # Main register table
-│   │   ├── TransactionRow.tsx    # Editable row
-│   │   ├── TransactionForm.tsx   # New transaction form
-│   │   └── FilterBar.tsx         # Date/type/category filters
-│   ├── dashboard/
-│   │   ├── SpendingChart.tsx     # Donut chart component
-│   │   ├── BillReminders.tsx     # Upcoming bills widget
-│   │   ├── BudgetSummary.tsx     # Budget progress widget
-│   │   └── WhatsLeft.tsx         # Remaining budget widget
-│   └── shared/
-│       ├── Currency.tsx          # Formatted currency display
-│       ├── DatePicker.tsx        # Date input component
-│       └── Modal.tsx             # Reusable modal
-├── lib/
-│   ├── db/
-│   │   ├── schema.ts            # Drizzle schema
-│   │   ├── index.ts             # DB connection
-│   │   ├── seed.ts              # Demo data seeder
-│   │   └── queries/             # Reusable query functions
-│   ├── utils/
-│   │   ├── currency.ts          # Currency formatting helpers
-│   │   ├── dates.ts             # Date utilities
-│   │   └── categories.ts        # Category tree helpers
-│   └── types/
-│       └── index.ts             # Shared TypeScript types
-└── styles/
-    └── globals.css              # Tailwind base + Quicken-specific styles
+closed_ledger/
+├── __main__.py                     # Entry point: python -m closed_ledger
+├── app.py                          # QApplication setup, passphrase gate, main window launch
+├── security/
+│   ├── __init__.py
+│   ├── crypto.py                   # Fernet encryption/decryption, key derivation, file I/O
+│   ├── passphrase.py               # Passphrase dialog, validation, first-run setup
+│   └── session.py                  # Auto-lock timer, session state management
+├── db/
+│   ├── __init__.py
+│   ├── connection.py               # SQLite connection manager (decrypt → open → use → close → encrypt)
+│   ├── schema.py                   # CREATE TABLE statements and migrations
+│   ├── seed.py                     # Demo data matching Quicken screenshots
+│   └── queries/
+│       ├── __init__.py
+│       ├── accounts.py             # Account balance queries
+│       ├── transactions.py         # Transaction CRUD, running balance
+│       ├── categories.py           # Category tree queries
+│       ├── bills.py                # Bill reminder queries
+│       ├── budgets.py              # Budget queries
+│       ├── dashboard.py            # Spending aggregation, upcoming bills
+│       └── reports.py              # Report data queries
+├── ui/
+│   ├── __init__.py
+│   ├── main_window.py              # QMainWindow: sidebar + tabs + content
+│   ├── sidebar.py                  # QTreeView account sidebar
+│   ├── top_nav.py                  # QTabBar navigation
+│   ├── status_bar.py               # Bottom status bar
+│   ├── views/
+│   │   ├── __init__.py
+│   │   ├── home.py                 # Dashboard: donut chart, bill reminders, budget summary
+│   │   ├── register.py             # Transaction register (QTableView)
+│   │   ├── spending.py             # Spending analysis view
+│   │   ├── bills.py                # Bill management view
+│   │   ├── budgets.py              # Budget tracking view
+│   │   └── reports.py              # Reports with charts
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── transaction_model.py    # QAbstractTableModel for transactions
+│   │   ├── account_model.py        # QStandardItemModel for account tree
+│   │   └── category_model.py       # QStandardItemModel for category picker
+│   ├── delegates/
+│   │   ├── __init__.py
+│   │   ├── currency_delegate.py    # Custom delegate for currency cells
+│   │   ├── date_delegate.py        # Custom delegate for date cells
+│   │   └── category_delegate.py    # Custom delegate for category dropdown
+│   ├── dialogs/
+│   │   ├── __init__.py
+│   │   ├── account_dialog.py       # Add/edit account
+│   │   ├── bill_dialog.py          # Add/edit bill reminder
+│   │   ├── import_dialog.py        # CSV import wizard
+│   │   └── backup_dialog.py        # Backup/restore
+│   └── widgets/
+│       ├── __init__.py
+│       ├── donut_chart.py          # Spending donut chart (QtCharts)
+│       ├── bar_chart.py            # Bar chart for reports
+│       ├── line_chart.py           # Line chart for net worth
+│       └── currency_label.py       # Formatted currency display widget
+└── utils/
+    ├── __init__.py
+    ├── currency.py                 # cents ↔ display formatting
+    ├── dates.py                    # Date helpers
+    └── platform.py                 # Platform-specific paths, file permissions
 ```
 
 ## Design Language
 
 The UI closely follows Quicken's visual conventions:
 
-- **Color Palette**: Steel blue header bar (`#4A7AB5`), white content area, light gray sidebar (`#F5F5F5`), red for debts/negative values, green/blue for positive
-- **Typography**: System font stack, 13–14px base for dense data display
-- **Layout**: Fixed left sidebar (240px), fixed top tab bar, scrollable content area
-- **Tables**: Dense row height (~32px), alternating row colors, right-aligned numbers
-- **Negative values**: Displayed in red (e.g., `-$283,043`), positive in black or dark gray
-- **Account Groups**: Collapsible sections with bold group headers and indented accounts
+- **Color Palette**: Steel blue header bar (`#4A7AB5`), white content area, light gray sidebar (`#F5F5F5`), red for debts/negative values
+- **Typography**: System font, 13–14px base for dense data display
+- **Layout**: Fixed left sidebar (~240px), tab bar across top, scrollable content area
+- **Tables**: Dense row height (~30px), alternating row colors, right-aligned numbers
+- **Negative values**: Displayed in red (e.g., `-$283,043`), positive in black
+- **Account Groups**: Collapsible tree nodes with bold group headers and indented accounts
 
 ## License
 

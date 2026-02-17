@@ -1,587 +1,600 @@
 # INSTRUCTIONS.md — Claude Code Workflow
 
-> **How to use this file**: Each phase below is designed to be run in its own Claude Code session. For each phase, you will copy-paste one or two prompts into Claude Code, let it work, then manually test the results using the provided checklist before moving to the next phase.
+> **How to use this file**: Each phase is a separate Claude Code session. Copy-paste the prompt, let it build, test with the checklist, fix issues, commit, move on.
 
 ---
 
-## How This Works
-
-### Your Workflow for Each Phase
+## Your Workflow
 
 ```
-1. Open a NEW Claude Code session (fresh context)
-2. Paste the CONTEXT PROMPT for that phase (it tells Claude Code what the project is and what's already done)
-3. Paste the BUILD PROMPT for that phase (the actual work instructions)
-4. Let Claude Code work. Answer any questions it asks.
-5. When it's done, run the TESTING CHECKLIST yourself.
-6. If something fails, paste the FIX PROMPT template with what's wrong.
-7. Once all tests pass, commit your code and move to the next phase.
+1. Open a NEW Claude Code session
+2. Paste the PROMPT for that phase
+3. Let Claude Code work
+4. Run the TESTING CHECKLIST yourself
+5. If something fails → paste the FIX PROMPT with the error
+6. Once all tests pass → commit and start next phase
 ```
-
-### Why New Sessions?
-
-Claude Code has a context window limit. A fresh session for each phase means Claude Code starts clean, reads the project files on disk, and doesn't get confused by stale context from previous work. The CONTEXT PROMPT at the start of each phase catches it up instantly.
 
 ### Fix Prompt Template
 
-Whenever something doesn't work after a phase, use this template:
-
 ```
-I just completed Phase [N] of the Closed Ledger project. Read IMPLEMENTATION.md for full context.
+I'm building Closed Ledger (Phase [N]). Read IMPLEMENTATION.md for full context.
 
-The following test is failing:
-[describe what's wrong — e.g., "The sidebar shows $0 for all account balances" or "npm run dev crashes with error: Cannot find module 'better-sqlite3'"]
+This is failing:
+[what's wrong]
 
-The expected behavior is:
-[describe what should happen]
+Expected:
+[what should happen]
 
-Please investigate and fix this issue. Do not change anything unrelated to this fix.
+Fix this without changing anything unrelated.
 ```
-
-### Important Files Claude Code Should Always Read
-
-At the start of each session, Claude Code should be aware of these files in the project root:
-- `README.md` — Project overview and structure
-- `IMPLEMENTATION.md` — Full architecture spec, data model, UI specs, color palette
-
-You don't need to tell Claude Code to read them explicitly — the context prompts below reference them. But if Claude Code seems confused, tell it: `Read IMPLEMENTATION.md before proceeding.`
 
 ---
 
 ## Phase 1: Foundation
 
-> **Goal**: A running Next.js app with SQLite database, complete schema, seed data, and the basic three-panel layout shell.
+> **Goal**: Project structure, security layer (encryption + passphrase), database with schema and seed data, and a passphrase-gated empty main window.
 
-### Step 1: Paste this CONTEXT + BUILD prompt into a new Claude Code session
-
-```
-I'm starting a new project called "Closed Ledger" — a personal finance manager inspired by
-Quicken Classic (2013–2017 era). The project has planning docs already written.
-
-Read README.md and IMPLEMENTATION.md in this directory. These define the full architecture,
-data model, UI specs, and phased build plan. Familiarize yourself with them before writing
-any code.
-
-Then execute Phase 1 — Foundation. Here's everything you need to build:
-
-1. PROJECT SETUP
-   - Initialize a Next.js 14 project with App Router, TypeScript (strict), Tailwind CSS 3
-   - The project name is "closed-ledger"
-   - Install dependencies: better-sqlite3, @types/better-sqlite3, drizzle-orm, drizzle-kit,
-     recharts, date-fns, lucide-react
-   - Install tsx as a dev dependency (for running seed/migrate scripts)
-   - Configure drizzle.config.ts for SQLite, pointing to src/lib/db/schema.ts, output to ./drizzle/migrations
-   - Add npm scripts:
-     "db:generate": "drizzle-kit generate"
-     "db:migrate": "tsx src/lib/db/migrate.ts"
-     "db:seed": "tsx src/lib/db/seed.ts"
-   - .gitignore must include data/ but NOT drizzle/
-
-2. DATABASE SCHEMA
-   Create src/lib/db/schema.ts with ALL five tables defined in IMPLEMENTATION.md:
-   accounts, transactions, categories, bill_reminders, budgets.
-   Follow the exact column definitions, types, and constraints from the doc.
-   All money values are INTEGER in cents. Dates are TEXT in ISO format.
-   Export table definitions AND inferred TypeScript types.
-
-3. DATABASE CONNECTION
-   Create src/lib/db/index.ts — a singleton that:
-   - Creates data/ directory if missing
-   - Opens data/closed-ledger.db with better-sqlite3
-   - Sets WAL journal mode and foreign_keys = ON
-   - Wraps with Drizzle ORM
-   - Exports the db instance
-
-4. MIGRATION RUNNER
-   Create src/lib/db/migrate.ts that runs pending Drizzle migrations.
-   Generate the initial migration with drizzle-kit generate.
-   Verify the migration runs without errors.
-
-5. SEED SCRIPT
-   Create src/lib/db/seed.ts matching the seed data spec in IMPLEMENTATION.md.
-   It must:
-   - Check if data exists already (skip if seeded, or clear and reseed)
-   - Insert categories first (full hierarchy from the doc)
-   - Insert accounts (all 13 accounts from the doc with correct initial balances)
-   - Insert 250+ transactions spanning the last 6 months using the exact payees
-     from the screenshots (Car Payment, ATM Withdrawal, Bo-bo- Chili And Ribs,
-     GameStop, Trader Joe's, etc.)
-   - Insert 6 bill reminders (Cable Bill, Car Insurance, Cell Phone, Credit Card Payment,
-     Internet Service, Transfer To Savings)
-   - Insert budgets for the current month
-   Run the seed script and verify data was inserted.
-
-6. LAYOUT SHELL
-   Build the three-panel layout visible in all Quicken screenshots:
-   - Root layout (src/app/layout.tsx): flex row, sidebar left + main right
-   - Sidebar (src/components/layout/Sidebar.tsx): 240px fixed width, light gray bg (#F5F5F5),
-     header with "ACCOUNTS" label, "All Transactions" link, placeholder account list,
-     "Net Worth" at bottom, "+ Add an Account" at very bottom. THIS IS JUST A SHELL —
-     Phase 2 will make it functional.
-   - Top nav (src/components/layout/TopNav.tsx): steel blue bar (#4A7AB5), white text,
-     tab items: HOME, SPENDING, BILLS, PLANNING, INVESTING, PROPERTY & DEBT, REPORTS.
-     Use Next.js Link. Active tab detection via usePathname.
-   - Global styles (src/styles/globals.css): Tailwind directives + CSS variables from
-     the color palette in IMPLEMENTATION.md
-
-7. ROUTE STUBS
-   Create placeholder pages that just show a centered message:
-   - src/app/page.tsx → "Dashboard coming in Phase 4"
-   - src/app/accounts/[id]/page.tsx → "Transaction Register coming in Phase 3"
-   - src/app/spending/page.tsx → "Spending analysis coming in Phase 5"
-   - src/app/bills/page.tsx → "Bills management coming in Phase 6"
-   - src/app/budgets/page.tsx → "Budget tracking coming in Phase 5"
-   - src/app/reports/page.tsx → "Reports coming in Phase 7"
-
-After building everything, run `npm run dev` and verify the app starts on localhost:3000.
-```
-
-### Step 2: Testing Checklist
-
-After Claude Code finishes, verify each of these yourself:
+### PROMPT — Copy this entire block into Claude Code:
 
 ```
-□ npm run dev starts without errors
-□ http://localhost:3000 loads and shows the three-panel layout
-□ Sidebar is visible on the left (gray background, "ACCOUNTS" header)
-□ Top nav bar is visible (steel blue, tab items are clickable)
-□ Clicking tab items navigates to the correct routes with placeholder messages
-□ data/closed-ledger.db file exists after first run
-□ npm run db:seed runs without errors
-□ Database has data — run this in terminal:
-  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM accounts;"      → should return 13
-  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM categories;"    → should return 40+
-  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM transactions;"  → should return 200+
-  sqlite3 data/closed-ledger.db "SELECT COUNT(*) FROM bill_reminders;" → should return 6
-□ Restarting npm run dev does NOT lose database data
-□ No TypeScript errors (run: npx tsc --noEmit)
+I'm starting a project called "Closed Ledger" — a native desktop personal finance app
+modeled after Quicken Classic. It is built with Python, PySide6, and SQLite. There is NO
+web server, no HTTP, no network of any kind.
+
+Read README.md and IMPLEMENTATION.md in this directory. They define the full architecture,
+security model, data model, and phased plan. Read them completely before writing any code.
+
+Build Phase 1 — Foundation. Everything below must be implemented:
+
+1. PROJECT STRUCTURE
+   Create the full directory tree from README.md "Project Structure".
+   Create requirements.txt with exactly: PySide6>=6.6 and cryptography>=42.0
+   Create closed_ledger/__main__.py as the entry point (python -m closed_ledger).
+   Create a .gitignore that ignores: __pycache__, *.pyc, venv/, .venv/, *.db, *.db.enc,
+   salt, key_check (never commit encrypted data or keys to git).
+
+2. SECURITY: ENCRYPTION MODULE (closed_ledger/security/crypto.py)
+   Implement these functions:
+   - derive_key(passphrase: str, salt: bytes) -> bytes:
+     Uses PBKDF2-HMAC-SHA256 with 600,000 iterations. Returns a Fernet-compatible key
+     (base64-encoded 32-byte key).
+   - generate_salt() -> bytes: returns 32 random bytes via os.urandom.
+   - encrypt_file(source_path: str, dest_path: str, key: bytes):
+     Reads source file, encrypts with Fernet(key), writes to dest_path.
+     Sets dest_path permissions to 0o600.
+   - decrypt_file(source_path: str, dest_path: str, key: bytes):
+     Reads encrypted file, decrypts with Fernet(key), writes to dest_path.
+     Sets dest_path permissions to 0o600.
+   - secure_delete(file_path: str):
+     Overwrites file content with os.urandom(file_size), then deletes it.
+     If file doesn't exist, silently returns.
+   - create_key_check(key: bytes, path: str):
+     Encrypts a known canary string ("CLOSED_LEDGER_KEY_CHECK") with the key,
+     writes to path. Used to verify passphrase on subsequent launches.
+   - verify_key_check(key: bytes, path: str) -> bool:
+     Decrypts the file at path, returns True if it matches the canary string.
+     Returns False on any decryption error (wrong key).
+
+3. SECURITY: PASSPHRASE DIALOG (closed_ledger/security/passphrase.py)
+   Two Qt dialogs:
+   - FirstRunDialog: shown when no salt/key_check files exist yet.
+     Has: passphrase input (QLineEdit, echo mode Password), confirm input,
+     minimum 8 characters validation, a warning label: "This passphrase encrypts your
+     financial data. If you lose it, your data CANNOT be recovered. There is no reset."
+     OK button only enabled when both fields match and >= 8 chars.
+   - UnlockDialog: shown on subsequent launches.
+     Has: passphrase input (QLineEdit, echo mode Password), OK button.
+     If passphrase is wrong (verify_key_check fails), show "Incorrect passphrase" in
+     red text. No hints. No "forgot password" link.
+   Both dialogs: no close/minimize/maximize buttons. Must enter passphrase or quit.
+   Both dialogs: passphrase string is overwritten (set to '') after key derivation.
+
+4. SECURITY: PLATFORM PATHS (closed_ledger/utils/platform.py)
+   - get_app_data_dir() -> Path: returns the platform-appropriate directory:
+     macOS: ~/Library/Application Support/closed-ledger/
+     Linux: ~/.local/share/closed-ledger/
+     Windows: %APPDATA%/closed-ledger/
+   - ensure_app_data_dir(): creates the directory with 0o700 permissions if it doesn't exist.
+   - get_db_encrypted_path() -> Path: app_data / "closed-ledger.db.enc"
+   - get_db_temp_path() -> Path: tempfile in system temp dir with random name
+   - get_salt_path() -> Path: app_data / "salt"
+   - get_key_check_path() -> Path: app_data / "key_check"
+   - get_backups_dir() -> Path: app_data / "backups"
+
+5. DATABASE: CONNECTION MANAGER (closed_ledger/db/connection.py)
+   Implement a DatabaseManager class that:
+   - __init__(self, encryption_key: bytes): stores the key, initializes state
+   - open(self): decrypts the .db.enc file to a temp path, opens sqlite3 connection,
+     enables WAL mode and foreign_keys. If no .db.enc exists yet, creates a fresh database.
+   - close(self): commits any pending transaction, closes sqlite3 connection,
+     encrypts the temp db back to .db.enc, then calls secure_delete on the temp file.
+   - get_connection(self) -> sqlite3.Connection: returns the active connection.
+   - Cleans up stale temp files on open (from previous crashes).
+   - Context manager support (__enter__, __exit__).
+
+6. DATABASE: SCHEMA (closed_ledger/db/schema.py)
+   - initialize_schema(conn: sqlite3.Connection): executes ALL CREATE TABLE and CREATE INDEX
+     statements from IMPLEMENTATION.md exactly as specified. Uses IF NOT EXISTS so it's
+     safe to call on every startup. This IS the migration system — additive CREATE IF NOT EXISTS.
+   - get_schema_version(conn) and set_schema_version(conn, version): for future migrations
+     using PRAGMA user_version.
+
+7. DATABASE: SEED (closed_ledger/db/seed.py)
+   - seed_database(conn): populates demo data matching the Quicken screenshots.
+     Categories (40+), accounts (13), transactions (250+), bill reminders (6), budgets (7).
+     Follow the exact specification in IMPLEMENTATION.md. Uses parameterized queries ONLY.
+   - is_seeded(conn) -> bool: checks if data already exists.
+   - Seed transactions should span the last 6 months using realistic dates, amounts, and
+     the exact payee names from the screenshots.
+
+8. APPLICATION ENTRY POINT (closed_ledger/app.py and __main__.py)
+   The startup flow is:
+   a) Create QApplication
+   b) ensure_app_data_dir()
+   c) Check if salt and key_check files exist:
+      - If no: show FirstRunDialog → get passphrase → generate salt → derive key →
+        create key_check → create fresh database → initialize schema
+      - If yes: show UnlockDialog → get passphrase → load salt → derive key →
+        verify against key_check → if wrong, show error, retry
+   d) Open DatabaseManager with the derived key
+   e) If --seed flag passed: run seed_database
+   f) Show MainWindow (empty shell for now)
+   g) On close: DatabaseManager.close() encrypts and cleans up
+
+   __main__.py: just calls app.main() with sys.argv
+
+9. MAIN WINDOW SHELL (closed_ledger/ui/main_window.py)
+   A QMainWindow with:
+   - Window title: "Closed Ledger"
+   - Left side: placeholder QWidget (240px wide, gray background #F5F5F5) with
+     QLabel "ACCOUNTS" — this will become the sidebar in Phase 2
+   - Right side: QTabBar across the top (steel blue #4A7AB5 background, white text)
+     with tabs: Home, Spending, Bills, Planning, Investing, Property & Debt, Reports
+   - Below tab bar: QStackedWidget with placeholder QLabels for each tab
+   - QStatusBar at the bottom
+   - Window size: 1200x800 default, remembers last position/size in config.json
+   - NO NETWORK CALLS ANYWHERE. Verify this.
+
+After building, test that: `python -m closed_ledger` launches, shows passphrase dialog,
+creates encrypted database, and shows the main window shell.
+If --seed flag: `python -m closed_ledger --seed` populates the database.
+
+CRITICAL SECURITY RULES:
+- NEVER use string formatting/interpolation in SQL. ALWAYS use ? placeholders.
+- NEVER store the passphrase to disk.
+- NEVER leave a plaintext .db file on disk after the app closes.
+- NEVER open any network socket or port.
+- ALL file creates must set restrictive permissions.
 ```
 
-**If something fails**, use the Fix Prompt Template above. Common Phase 1 issues:
-- `better-sqlite3` may need `node-gyp` / build tools — Claude Code should handle this
-- Drizzle config may need adjustment for the migration output path
-- Seed script may fail on foreign key ordering — categories must be inserted before transactions
+### TESTING CHECKLIST
 
-### Step 3: Commit
+```
+□ python -m closed_ledger runs without errors
+□ First launch shows FirstRunDialog with passphrase + confirm fields
+□ Cannot proceed with passphrase < 8 characters
+□ Cannot proceed when passphrase and confirm don't match
+□ After setting passphrase, main window appears
+□ Files exist in app data dir:
+  ls -la ~/.local/share/closed-ledger/  (or equivalent for your OS)
+  → closed-ledger.db.enc, salt, key_check
+□ File permissions are restrictive:
+  stat -c '%a' ~/.local/share/closed-ledger/closed-ledger.db.enc  → 600
+  stat -c '%a' ~/.local/share/closed-ledger/  → 700
+□ Encrypted DB is NOT readable as SQLite:
+  file ~/.local/share/closed-ledger/closed-ledger.db.enc  → should NOT say "SQLite"
+  sqlite3 ~/.local/share/closed-ledger/closed-ledger.db.enc ".tables"  → should error
+□ Close the app, relaunch → shows UnlockDialog
+□ Enter wrong passphrase → shows "Incorrect passphrase" in red, does not unlock
+□ Enter correct passphrase → main window appears
+□ No temp .db files left after clean close:
+  ls /tmp/*closed*  → should find nothing
+□ Main window has sidebar placeholder (gray) and tab bar (steel blue)
+□ Tabs are visible and clickable (content is placeholder text)
+□ python -m closed_ledger --seed populates data:
+  After seeding, close app, relaunch, unlock, and the app should start normally
+□ SECURITY: No network listeners:
+  While app is running: lsof -i -P -n | grep python → NO results (or none from this process)
+□ No TypeErrors or import errors in the terminal
+```
+
+### COMMIT
 
 ```bash
 git add -A
-git commit -m "Phase 1: Foundation — project setup, schema, seed data, layout shell"
+git commit -m "Phase 1: Foundation — security layer, encrypted database, passphrase gate, window shell"
 ```
 
 ---
 
 ## Phase 2: Account Sidebar
 
-> **Goal**: The sidebar becomes fully functional with real account balances, collapsible groups, net worth, and account CRUD.
+> **Goal**: QTreeView sidebar with real balances from the database, collapsible groups, net worth, add/edit account dialogs.
 
-### Step 1: Paste this CONTEXT + BUILD prompt
+### PROMPT
 
 ```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for the full architecture and data model.
+This is the Closed Ledger project — a native desktop Quicken clone.
+Read IMPLEMENTATION.md for the full architecture, data model, and UI specs.
 
-Phase 1 is complete: the project has a running Next.js app, SQLite database with Drizzle ORM,
-seeded data (13 accounts, 250+ transactions, categories, bill reminders), and a layout shell
-with a placeholder sidebar and top navigation.
+Phase 1 is complete: the app has a security layer (encrypted DB, passphrase gate),
+SQLite database with schema and seed data, and a main window shell.
 
-Now execute Phase 2 — Account Sidebar. Here's everything to build:
+Build Phase 2 — Account Sidebar.
 
-1. ACCOUNT QUERY FUNCTIONS (src/lib/db/queries/accounts.ts)
-   Create reusable server-side query functions:
-   - getAccountsWithBalances(): returns all non-hidden accounts with computed current balance.
-     Balance = initial_balance + SUM(transactions.amount). Use LEFT JOIN so accounts with
-     zero transactions still show. Order by group, sort_order, name.
-   - getAccountGroups(): calls getAccountsWithBalances(), groups them by `group` field,
-     returns array of { group, label, accounts, total }. Group labels:
-     banking→"Banking", investing→"Investing", property_debt→"Property & Debt",
+1. ACCOUNT QUERIES (closed_ledger/db/queries/accounts.py)
+   All queries use parameterized ? placeholders. No string formatting in SQL.
+   - get_accounts_with_balances(conn) -> list[dict]:
+     Returns all non-hidden accounts with computed current_balance.
+     SQL: SELECT a.*, (a.initial_balance + COALESCE(SUM(t.amount), 0)) AS current_balance
+     FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id
+     WHERE a.is_hidden = 0 GROUP BY a.id ORDER BY a.account_group, a.sort_order, a.name
+   - get_account_groups(conn) -> list[dict]:
+     Groups accounts by account_group. Returns list of:
+     { group: str, label: str, accounts: list, total: int (cents) }
+     Labels: banking→"Banking", investing→"Investing", property_debt→"Property & Debt",
      savings_goals→"Savings Goals"
-   - getNetWorth(): sum of all account current balances
-   - getAccountById(id): single account with current balance
+   - get_net_worth(conn) -> int: sum of all current balances (in cents)
+   - get_account_by_id(conn, account_id) -> dict
+   - create_account(conn, data: dict) -> int (new id)
+   - update_account(conn, account_id, data: dict)
+   - delete_account(conn, account_id): only if no transactions reference it
 
-2. SIDEBAR COMPONENT (src/components/layout/Sidebar.tsx)
-   Replace the placeholder sidebar with a fully functional server component:
-   - Header: "ACCOUNTS" bold text with RefreshCw, Plus, Settings icons (from lucide-react)
-   - "All Transactions" link (routes to /accounts/all)
-   - For each account group: an AccountGroup client component
-   - Net Worth at the bottom: "Net Worth" label with formatted total right-aligned
-   - "+ Add an Account" link at the very bottom
+2. SIDEBAR WIDGET (closed_ledger/ui/sidebar.py)
+   Replace the placeholder sidebar with a real QWidget containing:
+   - Header: QLabel "ACCOUNTS" (bold) with toolbar: refresh button, + button, settings button
+   - "All Transactions" clickable item at the top (QLabel styled as link or flat QPushButton)
+   - QTreeView with a QStandardItemModel showing account groups and accounts:
+     Root items: "Banking ($12,199)", "Investing ($178,094)", etc. (bold, with group total)
+     Child items: "  Family Checking  $1,491", "  My Checking  $2,832", etc.
+     Each child item stores the account_id in Qt.UserRole for click handling.
+   - Clicking a group item expands/collapses its children.
+   - Clicking an account item emits a signal with the account_id.
+   - Negative balances displayed in red (#CC0000).
+   - Active/selected account has highlighted background (#D0E0F0).
+   - Below the tree: QLabel "Net Worth" with formatted total, bold.
+   - Below net worth: QPushButton "+ Add an Account" (flat, link-styled)
 
-3. ACCOUNT GROUP COMPONENT (src/components/accounts/AccountGroup.tsx)
-   Client component ("use client") for expand/collapse:
-   - Group header row: ▼/▶ disclosure triangle, group label (bold), total balance (right-aligned)
-   - Clicking header toggles the children list
-   - Each child: account name (indented, regular weight) linked to /accounts/[id], balance right-aligned
-   - Negative balances in red text (credit cards, loans, mortgages)
-   - Active account highlighted with light blue background (detect via usePathname)
-   - Default state: expanded
+3. CURRENCY UTILITY (closed_ledger/utils/currency.py)
+   - cents_to_display(cents: int, show_cents=True) -> str:
+     123456 → "$1,234.56" (with show_cents) or "$1,235" (without)
+     Negative: -523400 → "-$5,234.00" (red in UI, but this function just formats the string)
+   - display_to_cents(text: str) -> int:
+     "$1,234.56" or "1234.56" or "1,234.56" → 123456
+   - cents_to_table(cents: int) -> str:
+     For table cells (no $ sign): 123456 → "1,234.56". Negative: -30000 → "300.00"
+     (Note: in the register, Payment column shows positive display of negative amounts)
 
-4. CURRENCY COMPONENT (src/components/shared/Currency.tsx)
-   - Takes amount in cents, formats for display
-   - Negative: red text, "-$5,325" format
-   - Positive: default color, "$13,200" format
-   - Use Intl.NumberFormat for comma separators
-   - Optional prop to show/hide cents (sidebar balances typically show whole dollars,
-     transaction register shows cents)
+4. ADD ACCOUNT DIALOG (closed_ledger/ui/dialogs/account_dialog.py)
+   QDialog with:
+   - Account Name: QLineEdit (required)
+   - Account Type: QComboBox with all types from schema
+   - Financial Institution: QLineEdit (optional)
+   - Opening Balance: QLineEdit with dollar input, converts to cents on save
+   - Auto-sets account_group and is_debt based on type selection
+     (use mapping from IMPLEMENTATION.md)
+   - OK/Cancel buttons. Validates name is not empty.
+   - Works in both add and edit mode (pre-fills fields when editing).
 
-5. ADD ACCOUNT MODAL
-   - Reusable Modal component (src/components/shared/Modal.tsx): backdrop overlay, centered card,
-     close on X/Escape/backdrop click, client component with portal
-   - AccountForm component (src/components/accounts/AccountForm.tsx): client component with fields:
-     Account Name (required), Account Type (dropdown with all types), Institution (optional),
-     Opening Balance (currency input in dollars, converts to cents). Auto-sets group and isDebt
-     from the type using the mapping in IMPLEMENTATION.md.
-   - API route POST /api/accounts: creates account, returns it
-   - API route GET /api/accounts: returns all accounts with balances
-   - Wire "+ Add an Account" to open the modal
-   - After creation, use router.refresh() to update the sidebar
+5. WIRING
+   - MainWindow receives account_selected signal from sidebar → switches to register view
+     (placeholder for now, just shows "Selected account: {name}" in the content area)
+   - "+ Add an Account" button opens AccountDialog → on accept, inserts via create_account,
+     refreshes sidebar
+   - Sidebar refreshes on any data change (account add/edit/delete, transaction create/delete)
+   - Expose a refresh_sidebar() method on the sidebar that re-queries and rebuilds the tree model
 
-6. EDIT & DELETE
-   - Small pencil icon appears on hover next to account names in sidebar
-   - Clicking opens the AccountForm in edit mode (pre-filled)
-   - API route PUT /api/accounts/[id]: updates account
-   - API route DELETE /api/accounts/[id]: deletes only if no transactions exist, else return error
-   - After edit/delete, refresh sidebar
-
-Verify that all account balances in the sidebar are correct by cross-referencing with the
-seed data. The net worth should match the sum of all account balances.
+SECURITY REMINDER: All database queries use parameterized ? placeholders.
+No string interpolation in SQL. Verify this in every query function.
 ```
 
-### Step 2: Testing Checklist
+### TESTING CHECKLIST
 
 ```
 □ Sidebar shows four account groups: Banking, Investing, Property & Debt, Savings Goals
-□ Each group has a total balance that matches the sum of its accounts
-□ Account balances match expected values from seed data:
-  Family Checking: ~$1,491  |  My Checking: ~$2,832  |  My Savings: $13,200
-  My Credit Card: ~-$5,325  |  Brokerage: $95,164  |  401(k): $82,930
-  (Exact values depend on seed transactions — just verify they're reasonable, not $0)
+□ Each group is expandable/collapsible by clicking
+□ Group totals are correct sums of their child accounts
+□ Account balances match expected seed data values (not $0, not unreasonable)
 □ Negative balances (credit card, loans, mortgage) display in red
-□ Clicking a group header collapses/expands the account list
-□ Clicking an account name navigates to /accounts/[id]
-□ The active account is highlighted in the sidebar
-□ "All Transactions" link navigates to /accounts/all
+□ Clicking an account highlights it and shows its name in the content area
+□ "All Transactions" is clickable at the top
 □ Net Worth at bottom = sum of all account balances
-□ "+ Add an Account" opens a modal
-□ Creating a new account (e.g., "Test Savings", type: savings, balance: $1000):
-  - Modal closes after submit
-  - New account appears in sidebar under Banking
-  - Balance shows $1,000
-□ Edit icon appears on hover, opens pre-filled form
-□ Delete works for accounts with no transactions, shows error for accounts with transactions
-□ No console errors
+□ "+ Add an Account" opens a dialog
+□ Creating a test account → appears in correct group, balance shows correctly
+□ Editing an account → changes reflected in sidebar
+□ Deleting account with no transactions → removed from sidebar
+□ Deleting account with transactions → shows error
+□ SECURITY: grep -rn "f'" closed_ledger/db/ and grep -rn '\.format' closed_ledger/db/
+  → should find NO string interpolation in SQL queries (only in display strings)
 ```
 
-### Step 3: Commit
+### COMMIT
 
 ```bash
 git add -A
-git commit -m "Phase 2: Account Sidebar — live balances, groups, CRUD, net worth"
+git commit -m "Phase 2: Account Sidebar — tree view, live balances, account CRUD"
 ```
 
 ---
 
 ## Phase 3: Transaction Register
 
-> **Goal**: The core data entry interface — a spreadsheet-like transaction table with CRUD, inline editing, filtering, and running balance. This is the biggest phase.
+> **Goal**: QTableView register with full CRUD, inline editing via delegates, filters, running balance, status bar. This is the biggest phase.
 
-### Step 1: Paste this CONTEXT + BUILD prompt
-
-```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for the full architecture, data model, and UI specs.
-
-Phase 1–2 are complete: the app has a running database, seeded data, and a fully functional
-sidebar with real account balances, collapsible groups, and account CRUD.
-
-Now execute Phase 3 — Transaction Register. This is the most important page in the app.
-It must closely match the transaction register from the Quicken screenshots described in
-IMPLEMENTATION.md under "Phase 3: Transaction Register" and "UI Reference Notes."
-
-Build ALL of the following:
-
-1. TRANSACTION QUERIES (src/lib/db/queries/transactions.ts)
-   - getTransactionsForAccount(accountId, filters?): returns transactions with category name
-     (joined as "Parent:Child" format) and running balance. Sorted by date ASC, id ASC.
-     Running balance = account.initialBalance + cumulative sum of amounts.
-     Filters: dateRange {start, end}, type (payment/deposit/transfer), reconciled (boolean).
-     For accountId="all": return all transactions across all accounts (no running balance).
-   - getTransactionById(id): single transaction with category info
-   - getPayeeSuggestions(query): distinct payee names matching prefix, for autocomplete
-   - getTransactionStats(accountId): { count, currentBalance, endingBalance } for the status bar
-
-2. CATEGORY QUERIES (src/lib/db/queries/categories.ts)
-   - getAllCategories(): all categories with parent name, formatted as "Parent:Child" display string
-   - getCategoryTree(): hierarchical tree for dropdown (groups children under parents)
-
-3. API ROUTES
-   - GET /api/transactions?accountId=X&dateStart=Y&dateEnd=Z&type=T
-   - POST /api/transactions: create transaction. Validate accountId, date, amount required.
-     If transferAccountId is provided, create paired transaction on other account.
-   - PUT /api/transactions/[id]: update transaction. If transfer, update paired transaction too.
-   - DELETE /api/transactions/[id]: delete transaction. If transfer, delete pair.
-   - GET /api/categories: all categories in tree structure
-
-4. TRANSACTION REGISTER PAGE (src/app/accounts/[id]/page.tsx)
-   Server component that:
-   - Fetches account info (name for header) and transactions with running balances
-   - Renders: account name as page header (e.g., "Family Checking"), FilterBar, TransactionTable, StatusBar
-   - Handles id="all" as a special case showing all transactions
-
-5. FILTER BAR (src/components/transactions/FilterBar.tsx)
-   Client component. Three select dropdowns + Reset button in a horizontal row:
-   - Date Range: All Dates, This Month, Last Month, This Year, Last Year, Last 12 Months
-   - Type: Any Type, Payment, Deposit, Transfer
-   - Status: All Transactions, Unreconciled, Reconciled
-   - Reset button clears all to defaults
-   - Filters update URL search params (so they survive refresh)
-   - Styled compactly matching the screenshots
-
-6. TRANSACTION TABLE (src/components/transactions/TransactionTable.tsx)
-   Client component. Columns matching IMPLEMENTATION.md Phase 3 exactly:
-   Status icon (30px) | Flag (24px) | Date (95px) | Check # (65px) | Payee (flex) |
-   Memo (150px) | Category (200px) | Tag (80px) | Payment (95px, right) | Deposit (95px, right) |
-   Balance (105px, right)
-   - Alternating row colors: white and #F0F5FA
-   - Header row: light gray background, bold text
-   - Currency in table: NO $ sign, just "300.00" and "3,556.31" (monospace/tabular-nums)
-   - Date format: M/D/YYYY
-
-7. INLINE EDITING (src/components/transactions/TransactionRow.tsx)
-   - Click a row → entire row becomes editable (all fields become inputs)
-   - Date: date input. Payee: text input with autocomplete from existing payees.
-     Category: searchable dropdown showing "Parent:Child" hierarchy.
-     Payment/Deposit: number input (dollars, converts to cents on save).
-   - Enter or click-away saves via PUT /api/transactions/[id]
-   - Escape cancels
-   - Tab moves between fields within the row
-   - Only ONE of Payment or Deposit should have a value (entering one clears the other)
-   - Delete icon (trash) appears on row hover, with confirmation popover
-
-8. NEW TRANSACTION ROW
-   Always visible as the last row, slightly different styling (e.g., light yellow bg or dashed border).
-   Fields are always in input mode. Date defaults to today.
-   Enter/Tab on last field creates transaction via POST and clears the row for the next entry.
-
-9. STATUS BAR (src/components/layout/StatusBar.tsx)
-   Fixed at bottom of content area. Three sections:
-   Left: "{N} Transactions" | Center: "Current Balance: X,XXX.XX" | Right: "Ending Balance: X,XXX.XX"
-   Subtle top border, 12px font.
-
-10. CATEGORY PICKER (src/components/shared/CategoryPicker.tsx)
-    Searchable dropdown for selecting categories:
-    - Typing filters the list
-    - Parent categories shown as group headers (bold, not selectable)
-    - Child categories shown indented below parents (selectable)
-    - Selected value displays as "Parent:Child" text
-
-After building, verify with seed data that the Family Checking register shows all its transactions
-with correct running balances and that the status bar numbers are accurate.
-```
-
-### Step 2: Testing Checklist
+### PROMPT
 
 ```
-□ Navigating to /accounts/[family-checking-id] shows the register
+This is the Closed Ledger project — a native desktop Quicken clone.
+Read IMPLEMENTATION.md for full architecture. Focus on Phase 3 specs and UI Reference.
+
+Phases 1–2 are complete: encrypted DB, passphrase gate, sidebar with live balances.
+
+Build Phase 3 — Transaction Register. This is the core of the application.
+
+1. TRANSACTION QUERIES (closed_ledger/db/queries/transactions.py)
+   All queries use parameterized ? placeholders. NEVER use f-strings in SQL.
+   - get_transactions_for_account(conn, account_id, filters=None) -> list[dict]:
+     Returns transactions with: all transaction fields, category display name
+     ("Parent:Child" format via JOIN), running_balance computed in Python after fetch
+     (sort by date ASC, id ASC, accumulate from initial_balance).
+     filters: optional dict with date_start, date_end, type (payment/deposit/transfer),
+     reconciled (bool). For account_id="all": all accounts, no running balance.
+   - create_transaction(conn, data: dict) -> int:
+     Inserts transaction. If transfer (transfer_account_id set), creates paired transaction.
+     Returns new transaction id.
+   - update_transaction(conn, txn_id, data: dict):
+     Updates transaction. If transfer, updates pair.
+   - delete_transaction(conn, txn_id):
+     Deletes transaction. If transfer, deletes pair.
+   - get_payee_suggestions(conn, prefix: str) -> list[str]:
+     SELECT DISTINCT payee WHERE payee LIKE ? (with parameterized LIKE)
+   - get_transaction_stats(conn, account_id) -> dict:
+     Returns { count, current_balance, ending_balance } for status bar.
+
+2. CATEGORY QUERIES (closed_ledger/db/queries/categories.py)
+   - get_all_categories(conn) -> list[dict]:
+     Returns all categories with display_name = "Parent:Child" via self-join
+   - get_category_tree(conn) -> list[dict]:
+     Hierarchical: [{ id, name, type, children: [{id, name, ...}] }]
+
+3. TRANSACTION TABLE MODEL (closed_ledger/ui/models/transaction_model.py)
+   Subclass QAbstractTableModel:
+   - Columns: Date, Check#, Payee, Memo, Category, Tag, Payment, Deposit, Balance
+   - data() returns formatted display values:
+     Date: M/D/YYYY format
+     Payment: positive display of negative amount, no $ sign (e.g., "300.00")
+     Deposit: positive amount, no $ sign
+     Balance: running balance, no $ sign
+   - setData() handles inline editing: converts user input back to storage format
+   - flags(): cells are editable (except Balance), selectable
+   - Support for an empty "new transaction" row at the bottom
+   - Emits dataChanged when transactions are modified
+
+4. CUSTOM DELEGATES (closed_ledger/ui/delegates/)
+   - CurrencyDelegate: for Payment, Deposit, Balance columns. Right-aligns text.
+     Creates QLineEdit editor that accepts decimal dollar input.
+     Formats display as "1,234.56" (no $ sign, tabular alignment).
+     Negative values (Balance column only) shown in red.
+   - DateDelegate: for Date column. Creates QDateEdit editor.
+     Displays as M/D/YYYY. Default new date: today.
+   - CategoryDelegate: for Category column. Creates QComboBox editor
+     populated from get_category_tree(). Shows "Parent:Child" display text.
+     Searchable/filterable via QCompleter.
+
+5. REGISTER VIEW (closed_ledger/ui/views/register.py)
+   A QWidget containing:
+   - Header: QLabel with account name in large bold text
+   - FilterBar: QHBoxLayout with three QComboBoxes + QPushButton "Reset":
+     Date Range: All Dates, This Month, Last Month, This Year, Last Year, Last 12 Months
+     Type: Any Type, Payment, Deposit, Transfer
+     Status: All Transactions, Unreconciled, Reconciled
+   - QTableView connected to TransactionTableModel:
+     Set column widths matching IMPLEMENTATION.md spec
+     Alternating row colors: white and #F0F5FA
+     Row height: ~30px
+     Set delegates for Date, Category, Payment, Deposit, Balance columns
+     Enable editing on double-click or Enter key
+   - New transaction row at bottom (always present, styled differently)
+   - Context menu on right-click: Edit, Delete (with confirmation)
+   - Keyboard: Enter saves edit, Escape cancels, Tab moves between cells, Delete key with confirmation
+
+6. STATUS BAR (closed_ledger/ui/status_bar.py)
+   Update the QStatusBar at bottom of main window when register is active:
+   Left: "{N} Transactions"
+   Center: "Current Balance: {formatted}"
+   Right: "Ending Balance: {formatted}"
+
+7. WIRING
+   - Clicking an account in sidebar → switches QStackedWidget to register view,
+     loads that account's transactions
+   - "All Transactions" → loads all transactions (no running balance column)
+   - After any transaction CRUD → refresh sidebar balances AND register data
+   - Filter changes → re-query and reload model
+
+SECURITY: Verify NO string interpolation in any SQL query. All use ? placeholders.
+The payee suggestions query must use parameterized LIKE: WHERE payee LIKE ? || '%'
+OR build the LIKE pattern in Python and pass as parameter: cursor.execute("... LIKE ?", (prefix + "%",))
+```
+
+### TESTING CHECKLIST
+
+```
+□ Click "Family Checking" in sidebar → register loads with transactions
 □ Page header shows "Family Checking"
-□ Table displays all transactions for that account
-□ Columns are correct: Date, Check#, Payee, Memo, Category, Tag, Payment, Deposit, Balance
-□ Date format is M/D/YYYY (not MM/DD/YYYY or ISO)
-□ Currency in table has no $ sign, just "300.00" format
-□ Alternating row colors (white and light blue)
-□ Running balance is correct:
-  - First transaction balance = initial balance + first transaction amount
-  - Each subsequent balance = previous balance + current amount
-  - LAST row balance matches the account balance shown in the sidebar
+□ Table columns: Date, Check#, Payee, Memo, Category, Tag, Payment, Deposit, Balance
+□ Date format is M/D/YYYY (not ISO, not MM/DD/YYYY)
+□ Payment/Deposit show no $ sign, just "300.00" format
+□ Alternating row colors visible
+□ Running balance: first row = initial balance + first amount
+□ Running balance: LAST row matches sidebar balance for that account
 □ Status bar shows correct transaction count and balance values
-□ FILTER: Selecting "This Month" filters to current month's transactions only
-□ FILTER: Selecting "Payment" shows only expense transactions
-□ FILTER: Reset button restores defaults
-□ INLINE EDIT: Clicking a row makes it editable
-□ INLINE EDIT: Changing the payee and pressing Enter saves the change
-□ INLINE EDIT: Escape cancels without saving
-□ NEW TRANSACTION: Typing in the bottom row and pressing Enter creates a new transaction
-□ NEW TRANSACTION: After creation, the new row appears in the table and sidebar balance updates
-□ DELETE: Trash icon appears on hover, clicking shows confirmation, confirming deletes the row
-□ Category picker shows hierarchical categories and is searchable
-□ "All Transactions" (/accounts/all) shows transactions from all accounts
-□ No console errors
+□ FILTER: "This Month" filters to current month only
+□ FILTER: "Payment" shows only expense transactions
+□ FILTER: Reset restores all transactions
+□ EDIT: Double-click a payee → editable, change it, press Enter → saved
+□ EDIT: Escape cancels edit
+□ NEW: Bottom row accepts new transaction → Enter creates it → sidebar updates
+□ DELETE: Right-click → Delete → confirmation → row removed → sidebar updates
+□ Category dropdown shows hierarchical "Parent:Child" entries
+□ "All Transactions" view shows transactions from all accounts
+□ SECURITY: grep -rn "f'" closed_ledger/db/ shows no SQL interpolation
 ```
 
-### Step 3: Commit
+### COMMIT
 
 ```bash
 git add -A
-git commit -m "Phase 3: Transaction Register — table, CRUD, filters, running balance"
+git commit -m "Phase 3: Transaction Register — QTableView, model/view/delegate, CRUD, filters"
 ```
 
 ---
 
 ## Phase 4: Home Dashboard
 
-> **Goal**: The landing page with spending chart, bill reminders, and budget summary.
+> **Goal**: Dashboard with donut chart, bill reminders, budget summary using QtCharts.
 
-### Step 1: Paste this CONTEXT + BUILD prompt
+### PROMPT
 
 ```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for full context, particularly the Phase 4 and UI Reference sections.
+This is the Closed Ledger project. Read IMPLEMENTATION.md for full context.
+Focus on Phase 4 specs and the UI Reference screenshots description.
 
-Phases 1–3 are complete: the app has a database with seeded data, a functional sidebar with
-real balances, and a full transaction register with inline editing, filtering, and running balances.
+Phases 1–3 complete: encrypted DB, sidebar, full transaction register.
 
-Now execute Phase 4 — Home Dashboard. This replaces the placeholder at src/app/page.tsx.
+Build Phase 4 — Home Dashboard. This is the view shown when "Home" tab is active.
 
-Build ALL of the following:
+1. DASHBOARD QUERIES (closed_ledger/db/queries/dashboard.py)
+   All queries use ? placeholders. No string interpolation in SQL.
+   - get_spending_by_category(conn, date_start, date_end) -> list[dict]:
+     Aggregate expense transactions (amount < 0) by TOP-LEVEL category.
+     If transaction has child category, group under parent.
+     Exclude transfers. Return { category_name, total_cents (positive), color }.
+     Map categories to chart colors from IMPLEMENTATION.md.
+   - get_upcoming_bills(conn, days_ahead) -> list[dict]:
+     Bills where next_due_date <= today + days_ahead.
+     Include status: 'overdue' / 'due_soon' / 'upcoming'.
+   - get_total_spending(conn, date_start, date_end) -> int (cents, positive)
+   - get_whats_left(conn) -> int:
+     Sum of budgets for current month minus sum of expenses this month.
 
-1. DASHBOARD QUERIES (src/lib/db/queries/dashboard.ts)
-   - getSpendingByCategory(dateStart, dateEnd): aggregate expense transactions (amount < 0)
-     by TOP-LEVEL category (if a transaction has a child category like "Food & Dining:Restaurants",
-     group it under the parent "Food & Dining"). Exclude transfers. Return array of
-     { category, total (in cents, as positive number), color }. Map categories to the color
-     palette defined in IMPLEMENTATION.md under "Category Color Mapping."
-   - getUpcomingBills(daysAhead): bill reminders where next_due_date is within the next N days.
-     Include computed status: 'overdue' if past due, 'due_soon' if within 7 days, 'upcoming' otherwise.
-   - getTotalSpending(dateStart, dateEnd): sum of all expense transactions in the range
-   - getWhatsLeft(): total budgeted for current month minus total expenses this month
+2. DONUT CHART WIDGET (closed_ledger/ui/widgets/donut_chart.py)
+   Uses PySide6.QtCharts:
+   - QPieSeries with setHoleSize(0.55) for donut effect
+   - Each slice colored by category color
+   - Slice labels show category name on hover
+   - Center text overlay (QLabel or custom paint): "TOTAL SPENDING\n$X,XXX"
+   - Legend on right side with category + color
+   - setAnimationOptions(QChart.AllAnimations)
+   - update_data(spending_data: list[dict]) method to refresh
 
-2. DASHBOARD PAGE (src/app/page.tsx)
-   Server component. Page title: "Overview". Three card sections stacked vertically:
+3. HOME VIEW (closed_ledger/ui/views/home.py)
+   QWidget with QVBoxLayout containing three card-style sections:
 
-   SECTION A — SPENDING BY CATEGORY
-   - Card header: "Spending By Category" left-aligned, total dollar amount right-aligned
-   - Date range dropdown in header: "Last Month (MMM)", "This Month", "Last 30 Days",
-     "Last 3 Months", "This Year" — defaults to "Last Month"
-   - Donut chart (Recharts PieChart with innerRadius for the hole)
-   - Center of donut: "TOTAL SPENDING" label + dollar amount (e.g., "$3,954")
-   - Right side: legend with category name + color swatch for each segment
-   - If no expense data in range, show "No spending data for this period"
+   SECTION A: Spending By Category
+   - QGroupBox or framed widget with header "Spending By Category"
+   - QComboBox in header: "Last Month", "This Month", "Last 30 Days", "Last 3 Months"
+   - DonutChartWidget showing spending data
+   - QPushButton "Examine Your Spending" linking to Spending tab
 
-3. SPENDING CHART COMPONENT (src/components/dashboard/SpendingChart.tsx)
-   Client component ("use client") — Recharts requires it.
-   - PieChart with Pie component, innerRadius ~60% of outerRadius
-   - Each Cell colored by the category's assigned color
-   - Tooltip on hover showing category name and dollar amount
-   - Custom center label (absolutely positioned text over the chart center)
-   - ResponsiveContainer wrapper for responsive sizing
-   - Date range selector triggers re-fetch of data
+   SECTION B: Bill & Income Reminders
+   - Header "Bill & Income Reminders" with QComboBox: "Next 7 Days", "Next 14 Days", "Next 30 Days"
+   - "TODAY" label with current date formatted
+   - QListWidget or custom widget showing bills:
+     Each row: status icon (colored circle), bill name, "Due in X days"/"Overdue", amount in red
+   - Amounts: -$150.00 format in red
 
-4. BILL REMINDERS WIDGET (src/components/dashboard/BillReminders.tsx)
-   - Card header: "Bill & Income Reminders" with dropdown: "Next 7 Days", "Next 14 Days", "Next 30 Days"
-   - "TODAY" badge with current date (e.g., "TODAY Feb 16")
-   - List of bills: status icon, bill name, "Due in X days" or "Overdue by X days", amount in red
-   - Status icon: red alert circle for overdue, orange clock for due soon, gray clock for upcoming
-   - Amounts formatted as -$XXX.XX in red
-   - If no bills in range: "No upcoming bills"
-
-5. BUDGET SUMMARY WIDGET (src/components/dashboard/BudgetSummary.tsx)
-   - Card header: "Budget"
-   - Large number: "$X,XXX left" in green if positive, red if negative
+   SECTION C: Budget Summary
+   - Header "Budget"
+   - Large QLabel: "$X,XXX left" in green (positive) or red (negative)
    - Subtitle: "in All Categories"
-   - If no budgets exist: "Set up your budget →" link to /budgets
+   - If no budgets: "Set up your budget →"
 
-Make sure the dashboard loads with real data from the seed. The spending chart should show
-actual spending from the seeded transactions. The bill reminders should show the 6 seeded bills.
+4. WIRING
+   - "Home" tab in QTabBar → shows HomeView in QStackedWidget
+   - Combo box changes re-query and refresh data
+   - This is the default view on app launch
+
+SECURITY: All queries use ? placeholders. No network calls in chart rendering.
 ```
 
-### Step 2: Testing Checklist
+### TESTING CHECKLIST
 
 ```
-□ Home page (/) shows "Overview" title with three card sections
-□ Spending donut chart renders with colored segments
-□ Total spending amount appears in the center of the donut
-□ Legend on the right shows category names with color swatches
-□ Changing the date range dropdown updates the chart data
-□ Bill reminders section shows the 6 seeded bills with correct amounts
-□ Bill due dates are reasonable ("Due in X days" or "Overdue by X days")
-□ Overdue bills show red indicator, due-soon bills show orange
-□ Budget summary shows a dollar amount or "Set up your budget" link
-□ Date range dropdown for bills (Next 7/14/30 days) changes the visible bills
-□ All dollar amounts are properly formatted with commas and $ signs
-□ Chart colors are consistent (Home=green, Food=orange, etc.)
-□ No console errors
-□ Dashboard loads fast (under 2 seconds)
+□ Home tab shows "Overview" or spending chart as default view
+□ Donut chart renders with colored segments (not empty, not erroring)
+□ Total spending amount shown in center of donut
+□ Changing date range combo updates the chart
+□ Bill reminders section shows seeded bills with correct amounts
+□ Bills show "Due in X days" or "Overdue by X days" correctly
+□ Overdue bills have red indicator
+□ Budget section shows dollar amount or "Set up your budget"
+□ All amounts properly formatted with $ signs and commas
+□ Chart colors consistent per category
+□ No console errors / no crashes on tab switch
 ```
 
-### Step 3: Commit
+### COMMIT
 
 ```bash
 git add -A
-git commit -m "Phase 4: Home Dashboard — spending chart, bill reminders, budget summary"
+git commit -m "Phase 4: Home Dashboard — donut chart, bill reminders, budget summary"
 ```
 
 ---
 
 ## Phase 5: Categories & Budgets
 
-> **Goal**: Category management and monthly budget tracking with budget vs. actual views.
-
-### Step 1: Paste this CONTEXT + BUILD prompt
+### PROMPT
 
 ```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for full context.
+Closed Ledger project. Read IMPLEMENTATION.md. Phases 1–4 complete.
 
-Phases 1–4 are complete: running app with database, sidebar, full transaction register,
-and home dashboard with spending chart and bill reminders.
+Build Phase 5 — Categories & Budgets.
 
-Now execute Phase 5 — Categories & Budgets.
+1. CATEGORY MANAGEMENT
+   Add a category management view accessible from a menu or settings:
+   - QTreeView showing all categories in hierarchy
+   - Each row: category name, type badge (income/expense/transfer), transaction count
+   - Add Category: QDialog with name, type QComboBox, optional parent QComboBox
+   - Edit/Rename: double-click or context menu
+   - Delete: only if no transactions reference it. Show count if in use and block.
+   - API: add_category, update_category, delete_category in queries/categories.py
+   ALL queries use ? placeholders.
 
-1. CATEGORY MANAGEMENT (route: /categories or accessible via a modal/settings)
-   - Tree view showing all categories in hierarchy (parents with children indented)
-   - Each row: category name, type badge (income/expense/transfer), transaction count using it
-   - Expand/collapse parent categories
-   - Add Category: name, type dropdown, optional parent category dropdown
-   - Edit Category: rename, change parent, change type
-   - Delete Category: only if no transactions reference it. If in use, show count and block deletion.
-   - API routes: GET/POST /api/categories, PUT/DELETE /api/categories/[id]
-
-2. BUDGET TRACKING PAGE (route: /budgets)
-   - Month navigation at top: ← arrow | "Month YYYY" | → arrow
-   - Summary bar: "Total Budgeted: $X,XXX | Total Spent: $X,XXX | Remaining: $X,XXX"
-   - Table with one row per budgeted expense category:
+2. BUDGET PAGE (Budgets tab in QStackedWidget)
+   - Month navigation: QPushButton ← | QLabel "Month YYYY" | QPushButton →
+   - Summary: "Budgeted: $X | Spent: $X | Remaining: $X"
+   - QTableView or QTreeWidget with rows per budgeted category:
      Category | Budgeted | Actual Spent | Remaining | Progress Bar
-   - Progress bar: green fill ≤75%, yellow 75-100%, red >100% of budget
-   - Budgeted column is editable — clicking shows an input to change the amount
-   - Actual Spent is computed from transactions in that category for the selected month
-   - Categories without a budget set can still show spending (with $0 budget)
-   - "Add Budget" row at bottom for categories not yet budgeted
+   - Progress bar: QProgressBar styled green ≤75%, yellow 75-100%, red >100%
+   - Budgeted column editable (double-click to enter amount)
+   - Unbudgeted categories with spending also shown (with $0 budget)
+   - Budget CRUD: queries/budgets.py with create/update/delete, all ? parameterized
 
-3. BUDGET API
-   - GET /api/budgets?year=YYYY&month=MM: returns budgets with actual spending per category
-   - POST /api/budgets: upsert — create or update budget for category+year+month
-   - DELETE /api/budgets/[id]: remove a budget line
+3. DASHBOARD INTEGRATION
+   Update the Budget summary widget on the home dashboard to show real computed data.
 
-4. DASHBOARD INTEGRATION
-   Update the Budget summary widget on the home dashboard (from Phase 4) to show real data:
-   - Compute: sum of all budget amounts for current month - sum of actual spending this month
-   - Display as "$X,XXX left" in green, or "-$XXX over budget" in red
-   - Link to /budgets for details
-
-Make sure all budget calculations use the same amount-in-cents convention as the rest of the app.
-The budget page should show meaningful data with the seeded budgets and transactions.
+SECURITY: All queries use ? placeholders. Verify with grep.
 ```
 
-### Step 2: Testing Checklist
+### TESTING CHECKLIST
 
 ```
-□ /categories (or category management UI) shows all categories in a tree
-□ Can add a new category (e.g., "Subscriptions" under "Bills & Utilities")
-□ Can rename an existing category
-□ Deleting a category with transactions shows an error/warning
-□ Deleting an unused category works
-□ /budgets page shows the current month with seeded budget data
-□ Budget table shows category, budgeted amount, actual spending, remaining
-□ Progress bars show correct fill level and color (green/yellow/red)
-□ Can change a budget amount by clicking the Budgeted column
-□ Month navigation (← →) changes the displayed month
-□ Navigating to a month with no budgets shows empty state or $0 values
-□ Dashboard budget widget now shows real "$ left" data
-□ Budget remaining matches: sum(budgets) - sum(expenses for the month)
-□ No console errors
+□ Category management shows full category tree
+□ Can add a new category with parent
+□ Can rename a category
+□ Delete blocked for categories with transactions
+□ Budgets tab shows current month data
+□ Budget table: correct category, budgeted, actual, remaining values
+□ Progress bars colored correctly (green/yellow/red)
+□ Can edit budget amount by double-clicking
+□ Month navigation changes displayed data
+□ Dashboard budget widget shows real "$ left" amount
+□ SECURITY: grep -rn "f'" closed_ledger/db/ → no SQL interpolation
 ```
 
-### Step 3: Commit
+### COMMIT
 
 ```bash
 git add -A
@@ -592,82 +605,48 @@ git commit -m "Phase 5: Categories & Budgets — category CRUD, budget tracking,
 
 ## Phase 6: Bills & Scheduling
 
-> **Goal**: Full bill reminder management, "Mark as Paid" flow, and recurring date advancement.
-
-### Step 1: Paste this CONTEXT + BUILD prompt
+### PROMPT
 
 ```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for full context.
+Closed Ledger project. Read IMPLEMENTATION.md. Phases 1–5 complete.
 
-Phases 1–5 are complete: running app with database, sidebar, transaction register,
-home dashboard, category management, and budget tracking.
+Build Phase 6 — Bills & Scheduling.
 
-Now execute Phase 6 — Bills & Scheduling.
-
-1. BILLS PAGE (route: /bills)
-   - Page title: "Bills & Income"
-   - Three sections: OVERDUE (red header), DUE SOON (orange, next 7 days), UPCOMING (gray)
-   - Each bill row shows:
-     Status indicator (red/orange/gray circle), bill name, amount (-$XXX in red, or +$XXX
-     in green for income), due date ("Due Feb 21" or "Overdue by 3 days"),
-     frequency badge ("Monthly"), "Auto" badge if is_automatic
-   - Action buttons per bill: "Mark as Paid" (green), "Skip" (gray), "Edit" (pencil icon)
+1. BILLS VIEW (Bills tab)
+   - Three sections: OVERDUE (red), DUE SOON (orange, 7 days), UPCOMING (gray)
+   - Each bill: status icon, name, amount, due date, frequency badge, "Auto" badge
+   - Action buttons: "Mark as Paid" (green), "Skip" (gray), "Edit" (pencil)
 
 2. MARK AS PAID
-   When clicking "Mark as Paid":
-   - Show confirmation dialog pre-filled with: amount, date (today), account, category
-   - User can adjust the amount or date before confirming
-   - On confirm:
-     a) Create a transaction on the bill's linked account with bill's amount (as negative
-        cents for expense, positive for income), bill's category, and the selected date
-     b) Advance next_due_date based on frequency:
-        weekly→+7d, biweekly→+14d, monthly→+1mo (date-fns addMonths),
-        quarterly→+3mo, annually→+1yr, once→mark as completed
-     c) Refresh the bills list, sidebar balances, and dashboard
-   - API: POST /api/bills/[id]/pay { amount?, date? }
+   - QDialog with pre-filled: amount, date (today), account, category
+   - User can adjust amount/date
+   - On confirm: create_transaction on linked account with bill's amount/category/date,
+     then advance next_due_date: weekly→+7d, biweekly→+14d, monthly→+1mo,
+     quarterly→+3mo, annually→+1yr, once→remove bill
+   - Refresh bills list, sidebar balances, dashboard
 
-3. SKIP
-   - Advance next_due_date without creating a transaction
-   - API: POST /api/bills/[id]/skip
+3. SKIP: advance due date without creating transaction
 
-4. BILL CRUD
-   - "Add Bill" button opens a modal with fields: name, amount (dollar input),
-     category (dropdown), account (dropdown), frequency (dropdown), next due date (date picker),
-     is income (checkbox), is automatic (checkbox)
-   - Edit opens same modal pre-filled
-   - Delete with confirmation
-   - API: POST/PUT/DELETE /api/bills, /api/bills/[id]
+4. BILL CRUD: QDialog for add/edit with all fields. Delete with confirmation.
+   queries/bills.py: all CRUD functions with ? parameterized queries.
 
-5. DASHBOARD INTEGRATION
-   Make sure the Bill Reminders widget on the home dashboard (Phase 4) uses the same query
-   as this page. Clicking a bill on the dashboard could navigate to /bills.
-
-Test with the 6 seeded bill reminders. Mark one as paid and verify a transaction was created
-and the due date advanced.
+SECURITY: All queries use ? placeholders. No string interpolation.
 ```
 
-### Step 2: Testing Checklist
+### TESTING CHECKLIST
 
 ```
-□ /bills page shows all 6 seeded bill reminders
-□ Bills are sorted into correct sections (overdue/due soon/upcoming)
-□ Each bill shows name, amount, due date, frequency badge
-□ "Mark as Paid" opens a confirmation dialog with pre-filled details
-□ Confirming "Mark as Paid":
-  - Creates a new transaction (visible in the account's register)
-  - Advances the bill's next_due_date by one frequency period
-  - Updates the sidebar balance for the affected account
-  - The bill moves to its new due date section
-□ "Skip" advances the due date without creating a transaction
-□ "Add Bill" opens modal, creating a new bill works
-□ "Edit" opens pre-filled modal, saving changes works
-□ Delete removes the bill with confirmation
-□ Dashboard bill reminders widget still works correctly
-□ No console errors
+□ Bills tab shows all 6 seeded bills in correct sections
+□ Mark as Paid → creates transaction visible in register
+□ Mark as Paid → due date advances correctly
+□ Mark as Paid → sidebar balance updates
+□ Skip → due date advances, no transaction created
+□ Add/Edit/Delete bill all work
+□ Dashboard bill reminders stay in sync
+□ SECURITY: All queries parameterized
 ```
 
-### Step 3: Commit
+### COMMIT
 
 ```bash
 git add -A
@@ -676,86 +655,45 @@ git commit -m "Phase 6: Bills & Scheduling — bill CRUD, mark as paid, recurrin
 
 ---
 
-## Phase 7: Reports & Analytics
+## Phase 7: Reports
 
-> **Goal**: Data visualization and financial analysis reports.
-
-### Step 1: Paste this CONTEXT + BUILD prompt
+### PROMPT
 
 ```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for full context.
+Closed Ledger project. Read IMPLEMENTATION.md. Phases 1–6 complete.
 
-Phases 1–6 are complete. The app has all core features: accounts, transactions, dashboard,
-categories, budgets, and bills.
+Build Phase 7 — Reports. Uses PySide6.QtCharts for all charts.
 
-Now execute Phase 7 — Reports & Analytics.
+Reports tab with sub-navigation (QComboBox or sub-tabs) for 4 report types:
 
-Build a reports hub at /reports with four report types, selectable via tabs or cards at the top:
+1. SPENDING OVER TIME: QBarSeries showing monthly expense totals, QValueAxis for $
+2. NET WORTH OVER TIME: QLineSeries tracking month-end net worth
+3. INCOME VS EXPENSES: grouped QBarSeries (green=income, red=expenses per month)
+4. CATEGORY BREAKDOWN: table + reuse donut chart, sorted by amount desc, expandable subcategories
 
-1. SPENDING OVER TIME
-   - Recharts BarChart showing monthly total spending (sum of expense transactions) for each month
-   - X-axis: month labels (Jan, Feb, Mar...), Y-axis: dollar amounts
-   - Tooltip on bar hover showing exact amount
-   - Date range selector: Last 6 Months, Last 12 Months, This Year, Last Year, All Time
+All reports: QComboBox date range (Last 6 Mo, 12 Mo, This Year, Last Year, All Time).
+queries/reports.py: all query functions with ? parameterized queries.
 
-2. NET WORTH OVER TIME
-   - Recharts LineChart tracking net worth at the end of each month
-   - For each month-end, compute: sum of all account initial balances + sum of all transactions
-     through that month-end date
-   - Show current net worth prominently above the chart
-   - Date range: Last 12 Months, Last 2 Years, All Time
+Charts: QChartView with QChart, proper axis labels ($ formatting), tooltips, legends.
 
-3. INCOME VS EXPENSES
-   - Recharts grouped BarChart: two bars per month (green=income, red=expenses)
-   - Below each pair: surplus/deficit label
-   - Date range selector
-   - Summary: total income, total expenses, net surplus/deficit for the period
-
-4. CATEGORY BREAKDOWN
-   - Detailed table: Category | Amount | % of Total | Avg per Month
-   - Sorted by amount descending
-   - Expandable rows to show subcategories
-   - Small horizontal bar next to each row showing relative size vs largest category
-   - Reuse the donut chart from the dashboard above the table
-   - Date range selector
-
-REPORT QUERIES (src/lib/db/queries/reports.ts):
-- getMonthlySpending(start, end): monthly expense totals as array of {month, year, total}
-- getNetWorthOverTime(start, end): net worth at each month-end
-- getMonthlyIncomeVsExpenses(start, end): monthly income and expense totals
-- getCategoryBreakdown(start, end): per-category spending with hierarchy
-
-ALL reports should have:
-- Date range controls (dropdown with presets)
-- Recharts with ResponsiveContainer, proper axis formatting (dollar amounts with $),
-  tooltips, and legends
-- Clean layout with the chart above and any summary stats below
-
-Use the seeded data to verify charts render with meaningful data.
+SECURITY: All queries use ? placeholders. No network calls.
 ```
 
-### Step 2: Testing Checklist
+### TESTING CHECKLIST
 
 ```
-□ /reports page loads with report type tabs/cards
-□ SPENDING OVER TIME: bar chart renders with monthly bars
-□ SPENDING OVER TIME: hovering a bar shows the dollar amount
-□ SPENDING OVER TIME: changing date range updates the chart
-□ NET WORTH: line chart renders with monthly data points
-□ NET WORTH: current net worth displayed above chart matches sidebar
-□ INCOME VS EXPENSES: grouped bars show income (green) and expenses (red)
-□ INCOME VS EXPENSES: surplus/deficit summary is accurate
-□ CATEGORY BREAKDOWN: table shows categories sorted by spending
-□ CATEGORY BREAKDOWN: percentages add up to ~100%
-□ CATEGORY BREAKDOWN: expandable rows show subcategories
-□ All charts use proper dollar formatting on axes ($1,000, $2,000, etc.)
-□ Date range selectors work across all report types
-□ Charts are responsive (resize with browser window)
-□ No console errors
+□ Reports tab loads with 4 report types selectable
+□ Spending over time: bar chart renders with monthly data
+□ Net worth: line chart renders, current value matches sidebar
+□ Income vs expenses: grouped bars visible
+□ Category breakdown: table sorted correctly, donut chart visible
+□ Date range changes update all charts
+□ Axis labels show proper $ formatting
+□ No crashes on empty date ranges
+□ SECURITY: All queries parameterized
 ```
 
-### Step 3: Commit
+### COMMIT
 
 ```bash
 git add -A
@@ -764,155 +702,175 @@ git commit -m "Phase 7: Reports — spending, net worth, income vs expenses, cat
 
 ---
 
-## Phase 8: Polish & Power Features
+## Phase 8: Polish & Security Hardening
 
-> **Goal**: CSV import/export, search, keyboard shortcuts, and final quality pass.
-
-### Step 1: Paste this CONTEXT + BUILD prompt
+### PROMPT
 
 ```
-This is the Closed Ledger project — a Quicken-inspired personal finance app.
-Read IMPLEMENTATION.md for full context.
+Closed Ledger project. Read IMPLEMENTATION.md. Phases 1–7 complete.
 
-Phases 1–7 are complete. All core features are built. Now execute Phase 8 — Polish.
+Build Phase 8 — Polish, security hardening, and packaging.
 
 1. CSV EXPORT
-   - "Export" button on the transaction register page
-   - Exports visible transactions (respecting filters) as CSV download
-   - Columns: Date, Payee, Memo, Category, Tag, Amount (dollars, negative for payments), Check #, Account
-   - Also add export capability to reports pages
-   - API: GET /api/transactions/export?accountId=X&dateStart=Y&dateEnd=Z → returns CSV
+   - Menu: File → Export Transactions → QFileDialog save-as .csv
+   - WARNING DIALOG before export: "This will create an UNENCRYPTED file containing
+     your financial data. The file will not be protected by your passphrase. Continue?"
+     Two buttons: "Export Anyway" / "Cancel"
+   - Exports visible transactions from current register (respects filters)
+   - Columns: Date, Payee, Memo, Category, Tag, Amount (dollars), Check#, Account
 
 2. CSV IMPORT
-   - "Import" button on the register or a /import route
-   - Upload: drag-and-drop zone + file picker for .csv files
-   - Step 1: Parse CSV, show preview of first 5 rows
-   - Step 2: Column mapping — dropdowns for each CSV column to map to: Date, Payee, Memo,
-     Category, Amount, Check Number, (Skip). Auto-detect common names.
-   - Step 3: Preview how transactions will look
-   - Step 4: Execute import on selected account
-   - Handle both single-amount and separate debit/credit column formats
-   - Error handling: show which rows failed and why
-   - API: POST /api/transactions/import
+   - Menu: File → Import Transactions
+   - Step 1: QFileDialog to select .csv file
+   - Step 2: Preview first 5 rows in a QTableWidget
+   - Step 3: Column mapping: QComboBoxes for each CSV column → Date/Payee/Memo/Category/Amount/Skip
+   - Step 4: Select target account from QComboBox
+   - Step 5: Preview mapped transactions
+   - Step 6: Import with progress bar. Show results (N imported, N failed with reasons)
 
 3. GLOBAL SEARCH
-   - Search icon in the top nav bar
-   - Opens a Cmd+K style search overlay/modal
-   - Search across all transactions: payee, memo, amount, category name
-   - Results grouped by account
-   - Clicking a result navigates to that transaction in its register
-   - Debounced 300ms search as user types
-   - API: GET /api/search?q=query&limit=20
+   - Ctrl+K or search icon in toolbar → QDialog with QLineEdit
+   - Searches: payee, memo, category name across ALL transactions
+   - Results in QListWidget grouped by account
+   - Click result → navigate to that account's register
+   - SECURITY: search query uses parameterized LIKE: cursor.execute("... LIKE ?", ('%' + query + '%',))
 
-4. KEYBOARD SHORTCUTS
-   - Ctrl/Cmd+K: open search
-   - Ctrl/Cmd+N: focus new transaction row
-   - Escape: cancel edit / close modal
-   - Enter: save current edit
-   - "?" key: show shortcuts help modal
+4. AUTO-LOCK (closed_ledger/security/session.py)
+   - QTimer that resets on any user interaction (install event filter on QApplication)
+   - After 15 minutes (configurable) of no interaction:
+     a) Encrypt database back to disk
+     b) Secure-delete temp plaintext file
+     c) Show UnlockDialog
+     d) On correct passphrase: decrypt and resume
+   - Expose lock timeout in config.json
 
-5. LOADING & EMPTY STATES
-   - Add loading.tsx skeleton/shimmer states for each route
-   - Empty state messages for: no transactions, no bills, no budgets, no report data
+5. KEYBOARD SHORTCUTS
+   - Ctrl+K: search
+   - Ctrl+N: new transaction (focus new row in register)
+   - Ctrl+S: save current edit
+   - Escape: cancel edit / close dialog
+   - Ctrl+Shift+B: backup
+   - F1 or ?: show shortcuts help dialog (QDialog with QTableWidget listing shortcuts)
 
-6. ERROR HANDLING
-   - API routes return proper error JSON with messages
-   - Forms show inline validation errors (required fields, invalid amounts)
-   - Toast/notification component for success messages ("Transaction created", "Bill paid")
+6. ENCRYPTED BACKUPS
+   - Menu: File → Backup → copies .db.enc to backups/ dir with timestamp
+   - Menu: File → Restore → QFileDialog to select .db.enc backup
+     WARNING: "This will replace your current data with the backup. Continue?"
+   - Both operations work on the encrypted file — no decryption needed.
 
-7. DATA BACKUP
-   - "Backup" button in sidebar settings area
-   - Copies closed-ledger.db to data/backups/closed-ledger-YYYY-MM-DD-HHMMSS.db
-   - "Restore" lists available backups and can replace the current database
-   - Confirmation dialog before restore (destructive action)
+7. LOADING STATES
+   - Show QProgressDialog or QLabel "Loading..." during long queries
+   - Startup: show progress while decrypting database
 
-8. PERFORMANCE
-   - Add database indexes: transactions(account_id, date), transactions(category_id),
-     transactions(payee), categories(parent_id)
-   - Verify sidebar and register load fast with 500+ transactions
+8. ERROR HANDLING
+   - All database operations wrapped in try/except
+   - User-facing errors shown in QMessageBox
+   - Financial data NEVER appears in error messages or logs
 
-9. PRINT STYLES
-   - @media print rules that hide sidebar and nav
-   - Reports are print-friendly
+9. PACKAGING (optional, instructions only)
+   Create a PACKAGING.md with instructions for:
+   - PyInstaller: pyinstaller --onefile --windowed closed_ledger/__main__.py
+   - Include PySide6 and cryptography in the bundle
+   - Set app icon
+   - Platform-specific notes (macOS .app, Windows .exe, Linux AppImage)
+
+SECURITY FINAL AUDIT:
+- grep -rn 'import requests\|import urllib\|import http.client\|import socket' closed_ledger/
+  → should return NOTHING (except possibly in comments)
+- grep -rn "f'" closed_ledger/db/ → no SQL interpolation
+- grep -rn '\.format' closed_ledger/db/ → no SQL interpolation
+- Verify: no temp .db files left after close
+- Verify: no listening sockets while running
+- Verify: encrypted file on disk is not valid SQLite
 ```
 
-### Step 2: Testing Checklist
+### TESTING CHECKLIST
 
 ```
-□ CSV EXPORT: "Export" button on register downloads a valid CSV file
-□ CSV EXPORT: Opening the CSV in a spreadsheet shows correct data
-□ CSV IMPORT: Can upload a CSV file and see a preview
-□ CSV IMPORT: Column mapping dropdowns work
-□ CSV IMPORT: Importing creates real transactions visible in the register
-□ SEARCH: Ctrl/Cmd+K opens search overlay
-□ SEARCH: Typing a payee name shows matching transactions
-□ SEARCH: Clicking a result navigates to the correct register
-□ SHORTCUTS: "?" shows keyboard shortcuts help
-□ LOADING: Pages show skeleton/shimmer while loading
-□ EMPTY STATES: New account shows "No transactions yet" message
-□ ERRORS: Submitting a transaction with no amount shows validation error
-□ TOAST: Creating a transaction shows a success notification
-□ BACKUP: Clicking backup creates a file in data/backups/
-□ BACKUP: Restore replaces the database (test with caution)
-□ PERFORMANCE: Register loads in under 1 second with all seed data
-□ PRINT: Ctrl+P on a report page shows a clean printable view
-□ No console errors across the entire application
+□ CSV EXPORT: File → Export → warning dialog appears → exports valid CSV
+□ CSV EXPORT: Exported file contains correct data, amounts in dollars
+□ CSV IMPORT: Can upload CSV, map columns, import to an account
+□ CSV IMPORT: Imported transactions appear in register with correct values
+□ SEARCH: Ctrl+K opens search, typing finds transactions by payee
+□ SEARCH: Clicking result navigates to correct register
+□ AUTO-LOCK: Set timeout to 1 minute for testing, wait → app locks
+□ AUTO-LOCK: Correct passphrase unlocks, data intact
+□ AUTO-LOCK: No temp .db file exists while locked
+□ SHORTCUTS: Ctrl+N focuses new transaction row
+□ SHORTCUTS: ? shows help dialog
+□ BACKUP: File → Backup creates timestamped .db.enc in backups/
+□ RESTORE: Selecting backup replaces data (test with caution)
+□ ERROR HANDLING: Invalid CSV → helpful error, no crash
+□ SECURITY AUDIT:
+  □ grep -rn 'import requests' closed_ledger/ → nothing
+  □ grep -rn 'import urllib' closed_ledger/ → nothing
+  □ grep -rn 'import socket' closed_ledger/ → nothing
+  □ grep -rn "f'" closed_ledger/db/ → no SQL string interpolation
+  □ lsof -i -P -n | grep python → no network listeners
+  □ file ~/.local/share/closed-ledger/closed-ledger.db.enc → not "SQLite"
+  □ ls /tmp/*closed* → no temp files after clean close
+  □ stat app data dir → 700, stat files → 600
+□ App runs cleanly from start to finish with no errors
 ```
 
-### Step 3: Final Commit
+### COMMIT
 
 ```bash
 git add -A
-git commit -m "Phase 8: Polish — CSV import/export, search, shortcuts, backup, loading states"
+git commit -m "Phase 8: Polish — CSV, search, auto-lock, backup, security hardening"
 ```
 
 ---
 
-## Post-Completion: Full App Verification
-
-After all 8 phases, run through this end-to-end test:
+## Post-Completion: Full Verification
 
 ```
-□ Fresh start: delete data/closed-ledger.db, run npm run dev — app creates DB automatically
-□ Run npm run db:seed — all seed data populates
-□ Sidebar shows 13 accounts with correct balances across 4 groups
-□ Net Worth is calculated correctly
-□ Click Family Checking → register shows 100+ transactions with correct running balance
-□ Create a new transaction → sidebar balance updates, register shows new row
-□ Delete a transaction → balance updates correctly
-□ Home dashboard shows spending chart with real data
-□ Bill reminders show upcoming bills with correct dates
-□ Mark a bill as paid → transaction created, due date advances, balances update
-□ Budget page shows budget vs actual for current month
-□ Reports page generates all 4 report types with real data
-□ Import a CSV from a bank → transactions appear in register
-□ Export transactions → valid CSV downloads
-□ Search finds transactions by payee name
-□ Backup creates a copy of the database file
-□ App handles 500+ transactions without performance issues
+□ Delete all app data, fresh start → passphrase creation works
+□ Seed data → all 13 accounts, 250+ transactions populated
+□ Sidebar balances correct, net worth correct
+□ Register: running balance last row matches sidebar
+□ Create/edit/delete transactions → balances update everywhere
+□ Dashboard: donut chart with real data, bills with correct dates
+□ Mark bill as paid → transaction created, date advanced
+□ Budgets: budget vs actual correct, progress bars work
+□ Reports: all 4 report types render with data
+□ CSV import → transactions appear correctly
+□ CSV export → warning shown, file is valid
+□ Auto-lock → encrypts and locks, unlock resumes
+□ Backup → creates encrypted copy, restore replaces data
+□ SECURITY:
+  □ No network sockets open (lsof)
+  □ DB file is encrypted on disk (not readable as SQLite)
+  □ No temp files after close
+  □ Wrong passphrase rejected
+  □ No SQL injection vectors (all queries parameterized)
+  □ File permissions restrictive (600/700)
+  □ No financial data in any log output
 ```
 
 ---
 
-## Troubleshooting Common Issues
+## Troubleshooting
 
-**"Cannot find module 'better-sqlite3'"**
-→ Run `npm install` again. May need build tools: `apt-get install build-essential python3`
+**"No module named 'PySide6'"**
+→ Activate your venv: `source venv/bin/activate`, then `pip install PySide6`
 
-**"SQLITE_CONSTRAINT: FOREIGN KEY constraint failed"**
-→ Seed script is inserting in wrong order. Categories must come before transactions.
+**"qt.qpa.plugin: Could not find the Qt platform plugin"**
+→ On Linux, install: `sudo apt install libxcb-xinerama0 libxkbcommon-x11-0`
 
-**"Hydration mismatch" errors**
-→ A server component is using browser-only APIs. Make sure client components have "use client" directive.
+**Passphrase dialog doesn't appear (app crashes silently)**
+→ Run from terminal: `python -m closed_ledger` to see Python traceback
+
+**Database appears corrupted after crash**
+→ The temp plaintext .db may still exist. Delete it manually, then relaunch (will decrypt from .db.enc)
+
+**"cryptography" install fails**
+→ Needs OpenSSL dev headers: `sudo apt install libssl-dev` (Linux) or `brew install openssl` (macOS)
+
+**Charts don't render (blank area)**
+→ Ensure PySide6 was installed with QtCharts: `pip install PySide6` should include it.
+   Verify: `python -c "from PySide6.QtCharts import QChart; print('OK')"`
 
 **Sidebar shows $0 for all balances**
-→ The balance query likely has a JOIN issue. Check that getAccountsWithBalances uses LEFT JOIN.
-
-**Running balance is wrong in the register**
-→ Check sort order: must be date ASC, id ASC. Check that initial balance is included as the starting point.
-
-**Charts don't render**
-→ Recharts requires "use client". Make sure chart components are client components.
-
-**Database resets on restart**
-→ Check that data/ is NOT in any clean/build script. The database file must persist.
+→ Check that seed ran successfully. Relaunch with `python -m closed_ledger --seed`
+→ Check that get_accounts_with_balances uses LEFT JOIN (accounts with 0 transactions should still show)
