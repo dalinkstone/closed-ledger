@@ -350,9 +350,9 @@ After every phase, run these checks:
 
 **Security:**
 - `lsof -i -P -n | grep python` shows NO listening sockets
-- Database file on disk is not valid SQLite (encrypted): `file ~/.closed-ledger/closed-ledger.db.enc` should not say "SQLite"
+- Database file on disk is not valid SQLite (encrypted): `file data/closed-ledger.db.enc` should not say "SQLite"
 - Incorrect passphrase is rejected with generic message
-- App data directory permissions are `0o700`, files are `0o600`
+- Data directory permissions are `0o700`, files are `0o600`
 
 **Data Integrity:**
 - Sum of transaction amounts + initial balance = sidebar balance for each account

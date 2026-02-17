@@ -50,7 +50,7 @@ Closed Ledger treats your financial data as sensitive by default.
 ### Data Persistence Strategy
 
 ```
-~/.closed-ledger/                   ← XDG-compliant app data directory
+<project-root>/data/                ← gitignored, per-machine data directory
 ├── closed-ledger.db.enc            ← Encrypted SQLite database
 ├── salt                            ← PBKDF2 salt (32 bytes, not secret)
 ├── key_check                       ← Encrypted canary value for passphrase verification
@@ -59,10 +59,7 @@ Closed Ledger treats your financial data as sensitive by default.
     └── closed-ledger-2026-02-16-143022.db.enc  ← Encrypted backups
 ```
 
-The app data directory uses the platform-appropriate location:
-- **macOS**: `~/Library/Application Support/closed-ledger/`
-- **Linux**: `~/.local/share/closed-ledger/`
-- **Windows**: `%APPDATA%/closed-ledger/`
+All data stays within the repository's `data/` directory (gitignored). Each machine that clones the repo creates its own passphrase and encrypted database on first run. Nothing is written outside the project root.
 
 ### Data Model (Core Entities)
 

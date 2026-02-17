@@ -1,4 +1,4 @@
-"""Platform-specific paths and file permissions."""
+"""Paths and file permissions. All data stored within the repo's data/ directory."""
 
 import os
 import sys
@@ -6,30 +6,28 @@ import tempfile
 from pathlib import Path
 
 
+def _get_project_root() -> Path:
+    """Return the repository root (parent of the closed_ledger package)."""
+    # This file is at: <repo>/closed_ledger/utils/platform.py
+    return Path(__file__).resolve().parent.parent.parent
+
+
 def get_app_data_dir() -> Path:
-    """Return the platform-appropriate app data directory."""
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "closed-ledger"
-    elif sys.platform == "win32":
-        appdata = os.environ.get("APPDATA", "")
-        if appdata:
-            return Path(appdata) / "closed-ledger"
-        return Path.home() / "closed-ledger"
-    else:
-        # Linux / other Unix
-        xdg = os.environ.get("XDG_DATA_HOME", "")
-        if xdg:
-            return Path(xdg) / "closed-ledger"
-        return Path.home() / ".local" / "share" / "closed-ledger"
+    """Return the data directory inside the project root.
+
+    All persistent files (encrypted DB, salt, key_check, config, backups)
+    live here. This directory is gitignored so each machine maintains its
+    own independent passphrase and encrypted database.
+    """
+    return _get_project_root() / "data"
 
 
 def ensure_app_data_dir() -> Path:
-    """Create the app data directory with restrictive permissions if needed."""
+    """Create the data directory with restrictive permissions if needed."""
     app_dir = get_app_data_dir()
     if not app_dir.exists():
         app_dir.mkdir(parents=True, mode=0o700)
     else:
-        # Ensure permissions are correct even if dir already exists
         if sys.platform != "win32":
             os.chmod(app_dir, 0o700)
     return app_dir
@@ -40,10 +38,11 @@ def get_db_encrypted_path() -> Path:
 
 
 def get_db_temp_path() -> Path:
-    """Return a temp file path with a random name for the decrypted database."""
-    fd, path = tempfile.mkstemp(prefix="closed_ledger_", suffix=".db")
+    """Return a temp file path inside data/ for the decrypted database."""
+    data_dir = get_app_data_dir()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    fd, path = tempfile.mkstemp(prefix="closed_ledger_", suffix=".db", dir=str(data_dir))
     os.close(fd)
-    # Set restrictive permissions
     if sys.platform != "win32":
         os.chmod(path, 0o600)
     return Path(path)

@@ -93,7 +93,18 @@ These are hard requirements — every phase must comply:
 
 ### Database
 
-Encrypted file at `~/.local/share/closed-ledger/closed-ledger.db.enc` (Linux), `~/Library/Application Support/closed-ledger/` (macOS), or `%APPDATA%/closed-ledger/` (Windows). Schema managed via additive `CREATE TABLE IF NOT EXISTS` statements in `schema.py`. Five tables: `accounts`, `transactions`, `categories`, `bill_reminders`, `budgets`.
+All persistent data lives in the gitignored `data/` directory at the project root. Each machine creates its own passphrase, salt, and encrypted database on first run — nothing is shared between machines via git.
+
+```
+data/                         ← gitignored, per-machine
+├── closed-ledger.db.enc      ← encrypted SQLite database
+├── salt                       ← PBKDF2 salt (not secret, but per-machine)
+├── key_check                  ← encrypted canary for passphrase verification
+├── config.json                ← window geometry, preferences
+└── backups/                   ← encrypted backup copies
+```
+
+Schema managed via additive `CREATE TABLE IF NOT EXISTS` statements in `schema.py`. Five tables: `accounts`, `transactions`, `categories`, `bill_reminders`, `budgets`.
 
 ### Qt Model/View Architecture
 

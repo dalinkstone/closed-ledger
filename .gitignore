@@ -3,11 +3,11 @@ __pycache__/
 *.pyo
 venv/
 .venv/
-*.db
-*.db.enc
-salt
-key_check
 *.egg-info/
 dist/
 build/
 .mypy_cache/
+
+# Per-machine data directory (encrypted DB, salt, key_check, config, backups).
+# Each machine creates its own passphrase and encrypted database on first run.
+data/

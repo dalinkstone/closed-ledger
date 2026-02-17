@@ -3,10 +3,9 @@
 import glob
 import os
 import sqlite3
-import tempfile
 
 from closed_ledger.security.crypto import decrypt_file, encrypt_file, secure_delete
-from closed_ledger.utils.platform import get_db_encrypted_path, get_db_temp_path
+from closed_ledger.utils.platform import get_app_data_dir, get_db_encrypted_path, get_db_temp_path
 
 
 class DatabaseManager:
@@ -69,12 +68,11 @@ class DatabaseManager:
 
     def _cleanup_stale_temp_files(self) -> None:
         """Remove any leftover temp database files from previous crashes."""
-        temp_dir = tempfile.gettempdir()
-        pattern = os.path.join(temp_dir, "closed_ledger_*.db")
+        data_dir = str(get_app_data_dir())
+        pattern = os.path.join(data_dir, "closed_ledger_*.db")
         for stale_file in glob.glob(pattern):
             try:
                 secure_delete(stale_file)
-                # Clean up WAL/SHM too
                 for suffix in ("-wal", "-shm"):
                     wal = stale_file + suffix
                     if os.path.exists(wal):
